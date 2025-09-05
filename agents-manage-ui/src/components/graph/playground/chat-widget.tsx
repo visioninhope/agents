@@ -1,4 +1,5 @@
 'use client';
+import { useRef, useEffect } from 'react';
 import { InkeepEmbeddedChat } from '@inkeep/cxkit-react-oss';
 import type { ComponentsConfig, InkeepCallbackEvent } from '@inkeep/cxkit-react-oss/types';
 import { EXECUTION_API_BASE_URL } from '@/lib/api/api-config';
@@ -107,16 +108,44 @@ export function ChatWidget({
   startPolling,
   stopPolling,
 }: ChatWidgetProps) {
+  const stopPollingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (stopPollingTimeoutRef.current) {
+        clearTimeout(stopPollingTimeoutRef.current);
+        stopPollingTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
   return (
     <div className="h-full flex flex-row gap-4">
       <div className="flex-1 min-w-0 h-full">
         <InkeepEmbeddedChat
           baseSettings={{
             onEvent: (event: InkeepCallbackEvent) => {
+              if (event.eventName === 'assistant_message_received') {
+                // Add a delay before stopping polling to allow activity data to be available
+                stopPollingTimeoutRef.current = setTimeout(() => {
+                  stopPolling();
+                  stopPollingTimeoutRef.current = null;
+                }, 5000);
+              }
               if (event.eventName === 'user_message_submitted') {
+                // Cancel any pending stop polling timeout since we need to keep polling
+                if (stopPollingTimeoutRef.current) {
+                  clearTimeout(stopPollingTimeoutRef.current);
+                  stopPollingTimeoutRef.current = null;
+                }
                 startPolling();
               }
               if (event.eventName === 'chat_clear_button_clicked') {
+                // Cancel any pending stop polling timeout
+                if (stopPollingTimeoutRef.current) {
+                  clearTimeout(stopPollingTimeoutRef.current);
+                  stopPollingTimeoutRef.current = null;
+                }
                 stopPolling();
                 setConversationId(nanoid());
               }
@@ -171,7 +200,7 @@ export function ChatWidget({
             components: {
               IkpMessage,
             },
-            introMessage: 'Hi!'
+            introMessage: 'Hi!',
           }}
         />
       </div>
