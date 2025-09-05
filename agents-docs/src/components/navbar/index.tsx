@@ -14,7 +14,7 @@ export const Navbar = () => {
       <div className="flex flex-row items-center h-full max-w-fd-container mx-auto">
         <div className="flex-none lg:w-[var(--sidebar-width)] relative isolate flex items-center gap-x-3 lg:border-r lg:border-gray-100 lg:dark:border-gray-800 border-fd-foreground/10 pr-4">
           <Fade className="border-r border-gray-100 dark:border-gray-800  hidden lg:block" />
-          <Link href="/docs/overview" className="flex-1">
+          <Link href="/" className="flex-1">
             <Logo className="!w-[110px] !h-[32px] mx-2 my-4" />
           </Link>
           <ThemeToggle />

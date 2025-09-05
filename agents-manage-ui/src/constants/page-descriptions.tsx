@@ -8,7 +8,7 @@ export const artifactDescription = (
     Artifacts automatically capture and store source information from tool and agent interactions,
     providing a record of where data originates.
     {'\n'}
-    <ExternalLink href={`${DOCS_BASE_URL}/docs/visual-builder/artifact-components`}>
+    <ExternalLink href={`${DOCS_BASE_URL}/visual-builder/artifact-components`}>
       Learn more
     </ExternalLink>
   </>
@@ -18,7 +18,7 @@ export const dataComponentDescription = (
   <>
     Data components are structured components that agents can use to display rich data.
     {'\n'}
-    <ExternalLink href={`${DOCS_BASE_URL}/docs/visual-builder/data-components`}>
+    <ExternalLink href={`${DOCS_BASE_URL}/visual-builder/data-components`}>
       Learn more
     </ExternalLink>
   </>
@@ -28,7 +28,7 @@ export const graphDescription = (
   <>
     Graphs are visual representations of the data flow between agents and tools.
     {'\n'}
-    <ExternalLink href={`${DOCS_BASE_URL}/docs/visual-builder/graphs`}>Learn more</ExternalLink>
+    <ExternalLink href={`${DOCS_BASE_URL}/visual-builder/graphs`}>Learn more</ExternalLink>
   </>
 );
 

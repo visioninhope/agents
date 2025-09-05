@@ -7,7 +7,7 @@ Agents are the core building blocks of our framework, designed to be both powerf
 
 ## Creating an Agent
 
-Every agent needs a unique identifier, and clear prompt that define its behavior:
+Every agent needs a unique identifier and a clear prompt that define its behavior:
 
 ```typescript
 import { agent } from "./builder/index.js";
@@ -177,7 +177,7 @@ When no model settings are configured at any level (project, graph, or agent), t
 
 ### Provider Options
 
-Each model settings can include `providerOptions` with provider-specific settings:
+Each model setting can include `providerOptions` with provider-specific settings:
 - `temperature`: Response creativity (0.0-1.0)
 - `maxTokens`: Maximum response length
 - `timeout`: Request timeout in milliseconds (e.g., `30000` for 30 seconds)

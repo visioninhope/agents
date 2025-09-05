@@ -40,7 +40,7 @@ const bottomNavItems: NavItemProps[] = [
   },
   {
     title: 'Documentation',
-    url: `${DOCS_BASE_URL}/docs/`,
+    url: `${DOCS_BASE_URL}/`,
     icon: BookOpen,
     isExternal: true,
   },
