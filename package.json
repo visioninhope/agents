@@ -12,7 +12,7 @@
     "sync:licenses": "node scripts/sync-licenses.mjs",
     "prebuild": "pnpm install --frozen-lockfile && pnpm sync:licenses",
     "build": "turbo build",
-    "dev": "turbo dev",
+    "dev": "ENVIRONMENT=development turbo dev",
     "dev:apis": "turbo dev:apis",
     "pretest": "pnpm install --frozen-lockfile",
     "test": "turbo test",
