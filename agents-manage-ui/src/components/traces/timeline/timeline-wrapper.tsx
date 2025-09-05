@@ -16,6 +16,7 @@ import { Loader2, ChevronDown, ChevronUp, RefreshCw, AlertTriangle } from 'lucid
 import { ConversationTracesLink } from '@/components/traces/signoz-link';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertTitle } from '@/components/ui/alert';
+import { toast } from 'sonner';
 
 function panelTitle(selected: SelectedPanel) {
   switch (selected.type) {
@@ -52,9 +53,18 @@ interface TimelineWrapperProps {
   isPolling?: boolean;
   error?: string | null;
   retryConnection?: () => void;
+  refreshOnce?: () => Promise<{ hasNewActivity: boolean }>;
 }
 
-function EmptyTimeline({ isPolling, error, retryConnection }: { isPolling: boolean, error?: string | null, retryConnection?: () => void }) {
+function EmptyTimeline({
+  isPolling,
+  error,
+  retryConnection,
+}: {
+  isPolling: boolean;
+  error?: string | null;
+  retryConnection?: () => void;
+}) {
   if (error) {
     return (
       <div className="flex flex-col gap-4 h-full justify-center items-center px-6">
@@ -98,13 +108,16 @@ export function TimelineWrapper({
   isPolling = false,
   error,
   retryConnection,
+  refreshOnce,
 }: TimelineWrapperProps) {
   const [selected, setSelected] = useState<SelectedPanel | null>(null);
   const [panelVisible, setPanelVisible] = useState(false);
-  
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   // State for collapsible AI messages
   const [collapsedAiMessages, setCollapsedAiMessages] = useState<Set<string>>(new Set());
-  const [aiMessagesGloballyCollapsed, setAiMessagesGloballyCollapsed] = useState<boolean>(enableAutoScroll);
+  const [aiMessagesGloballyCollapsed, setAiMessagesGloballyCollapsed] =
+    useState<boolean>(enableAutoScroll);
 
   useEffect(() => {
     if (selected) {
@@ -143,12 +156,13 @@ export function TimelineWrapper({
   // Initialize AI messages based on view type when activities change
   useEffect(() => {
     const aiMessageIds = sortedActivities
-      .filter(activity => 
-        activity.type === ACTIVITY_TYPES.AI_ASSISTANT_MESSAGE || 
-        activity.type === ACTIVITY_TYPES.AI_MODEL_STREAMED_TEXT
+      .filter(
+        (activity) =>
+          activity.type === ACTIVITY_TYPES.AI_ASSISTANT_MESSAGE ||
+          activity.type === ACTIVITY_TYPES.AI_MODEL_STREAMED_TEXT
       )
-      .map(activity => activity.id);
-    
+      .map((activity) => activity.id);
+
     if (enableAutoScroll) {
       // Live trace view: default collapsed
       setCollapsedAiMessages(new Set(aiMessageIds));
@@ -159,7 +173,7 @@ export function TimelineWrapper({
       setAiMessagesGloballyCollapsed(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sortedActivities.length, enableAutoScroll]); // Run when activities count or view type changes
+  }, [sortedActivities.length, enableAutoScroll]); //  Run when activities count or view type changes
 
   // Functions to handle expand/collapse all
   const expandAllAiMessages = () => {
@@ -169,11 +183,12 @@ export function TimelineWrapper({
 
   const collapseAllAiMessages = () => {
     const aiMessageIds = sortedActivities
-      .filter(activity => 
-        activity.type === ACTIVITY_TYPES.AI_ASSISTANT_MESSAGE || 
-        activity.type === ACTIVITY_TYPES.AI_MODEL_STREAMED_TEXT
+      .filter(
+        (activity) =>
+          activity.type === ACTIVITY_TYPES.AI_ASSISTANT_MESSAGE ||
+          activity.type === ACTIVITY_TYPES.AI_MODEL_STREAMED_TEXT
       )
-      .map(activity => activity.id);
+      .map((activity) => activity.id);
     setCollapsedAiMessages(new Set(aiMessageIds));
     setAiMessagesGloballyCollapsed(true);
   };
@@ -186,15 +201,16 @@ export function TimelineWrapper({
       newCollapsed.add(activityId);
     }
     setCollapsedAiMessages(newCollapsed);
-    
+
     // Update global state based on current state
     const aiMessageIds = sortedActivities
-      .filter(activity => 
-        activity.type === ACTIVITY_TYPES.AI_ASSISTANT_MESSAGE || 
-        activity.type === ACTIVITY_TYPES.AI_MODEL_STREAMED_TEXT
+      .filter(
+        (activity) =>
+          activity.type === ACTIVITY_TYPES.AI_ASSISTANT_MESSAGE ||
+          activity.type === ACTIVITY_TYPES.AI_MODEL_STREAMED_TEXT
       )
-      .map(activity => activity.id);
-    const allCollapsed = aiMessageIds.every(id => newCollapsed.has(id));
+      .map((activity) => activity.id);
+    const allCollapsed = aiMessageIds.every((id) => newCollapsed.has(id));
     setAiMessagesGloballyCollapsed(allCollapsed);
   };
 
@@ -209,7 +225,8 @@ export function TimelineWrapper({
     );
 
   const determinePanelType = (a: ActivityItem): Exclude<PanelType, 'mcp_tool_error'> => {
-    if (a.type === ACTIVITY_TYPES.TOOL_CALL && a.toolType === TOOL_TYPES.TRANSFER) return 'transfer';
+    if (a.type === ACTIVITY_TYPES.TOOL_CALL && a.toolType === TOOL_TYPES.TRANSFER)
+      return 'transfer';
     if (a.type === ACTIVITY_TYPES.TOOL_CALL && a.toolName?.includes('delegate'))
       return 'delegation';
     if (
@@ -222,6 +239,21 @@ export function TimelineWrapper({
     return a.type;
   };
 
+  const handleRefresh = async () => {
+    if (!refreshOnce || isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      const result = await refreshOnce();
+      if (!result.hasNewActivity) {
+        toast.info('No new activity found');
+      }
+      setIsRefreshing(false);
+    } catch {
+      toast.error('Failed to refresh activities');
+      setIsRefreshing(false);
+    }
+  };
+
   return (
     <>
       <ResizablePanel order={2}>
@@ -231,17 +263,24 @@ export function TimelineWrapper({
               <div className="text-foreground text-md font-medium">Activity Timeline</div>
               <div className="flex items-center gap-2">
                 {/* Expand/Collapse AI Messages Buttons */}
-                {sortedActivities.some(activity => 
-                  activity.type === ACTIVITY_TYPES.AI_ASSISTANT_MESSAGE || 
-                  activity.type === ACTIVITY_TYPES.AI_MODEL_STREAMED_TEXT
+                {sortedActivities.some(
+                  (activity) =>
+                    activity.type === ACTIVITY_TYPES.AI_ASSISTANT_MESSAGE ||
+                    activity.type === ACTIVITY_TYPES.AI_MODEL_STREAMED_TEXT
                 ) && (
                   <div className="flex items-center gap-1">
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={aiMessagesGloballyCollapsed ? expandAllAiMessages : collapseAllAiMessages}
+                      onClick={
+                        aiMessagesGloballyCollapsed ? expandAllAiMessages : collapseAllAiMessages
+                      }
                       className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                      title={aiMessagesGloballyCollapsed ? "Expand all AI messages" : "Collapse all AI messages"}
+                      title={
+                        aiMessagesGloballyCollapsed
+                          ? 'Expand all AI messages'
+                          : 'Collapse all AI messages'
+                      }
                     >
                       {aiMessagesGloballyCollapsed ? (
                         <>
@@ -265,7 +304,11 @@ export function TimelineWrapper({
           </div>
           <div className="p-0 flex-1 min-h-0">
             {sortedActivities.length === 0 ? (
-              <EmptyTimeline isPolling={isPolling} error={error} retryConnection={retryConnection} />
+              <EmptyTimeline
+                isPolling={isPolling}
+                error={error}
+                retryConnection={retryConnection}
+              />
             ) : enableAutoScroll ? (
               <StickToBottom
                 className="h-full [&>div]:overflow-y-auto [&>div]:scrollbar-thin [&>div]:scrollbar-thumb-muted-foreground/30 [&>div]:scrollbar-track-transparent dark:[&>div]:scrollbar-thumb-muted-foreground/50"
@@ -281,6 +324,24 @@ export function TimelineWrapper({
                     collapsedAiMessages={collapsedAiMessages}
                     onToggleAiMessageCollapse={toggleAiMessageCollapse}
                   />
+                  {!isPolling && sortedActivities.length > 0 && !error && refreshOnce && (
+                    <div className="flex justify-center items-center z-10">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRefresh}
+                        disabled={isRefreshing}
+                        className=" text-xs bg-background/80 backdrop-blur-sm  hover:bg-background/90 transition-all duration-200 opacity-70 hover:opacity-100"
+                      >
+                        {isRefreshing ? (
+                          <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-3 w-3 mr-1.5" />
+                        )}
+                        {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                      </Button>
+                    </div>
+                  )}
                 </StickToBottom.Content>
               </StickToBottom>
             ) : (
