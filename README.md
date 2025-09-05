@@ -61,16 +61,28 @@ The Inkeep Agent Framework is licensed under the **Elastic License 2.0** ([ELv2]
 
 ## Getting Started
 
-```bash
-cd agents-run-api
-```
+Create environment variables in a new file at `agents-manage-api/.env`, `agents-run-api/.env`, `agents-manage-ui/.env`, and `packages/agents-core/.env`:
 
-Create environment variables in a new file at `agents-run-api/.env`
+Example `agents-manage-api/.env.example`:
 ```
 ENVIRONMENT=development
 DB_FILE_NAME=file:local.db
 ANTHROPIC_API_KEY=
 ```
+
+Example `agents-run-ui/.env.example`:
+```
+ENVIRONMENT=development
+DB_FILE_NAME=file:local.db
+ANTHROPIC_API_KEY=
+```
+
+Example `packages/agents-core/.env.example`:
+```
+DB_FILE_NAME=file:../../local.db
+```
+
+All `DB_FILE_NAME` should point to the same sqlite file.  
 
 ### Installation
 
