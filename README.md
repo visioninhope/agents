@@ -63,7 +63,7 @@ Thank you for your interest in contributing to the Agent Framework! Here are gui
 
 ### Getting Started with Local Dev
 
-First, add your `ANTHROPIC_API_KEY` to an `.env` file at `agents-manage-api/.env`:
+First, add your `ANTHROPIC_API_KEY` to an `.env` file at `/agents-run-api`:
 ```
 ANTHROPIC_API_KEY=sk-ant-xyz789
 ```
