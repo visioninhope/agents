@@ -12,9 +12,10 @@ import { TOOL_TYPES } from '@/components/traces/timeline/types';
 import { renderPanelContent } from '@/components/traces/timeline/render-panel-content';
 import { StickToBottom } from 'use-stick-to-bottom';
 import { ResizableHandle, ResizablePanel } from '@/components/ui/resizable';
-import { Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, ChevronDown, ChevronUp, RefreshCw, AlertTriangle } from 'lucide-react';
 import { ConversationTracesLink } from '@/components/traces/signoz-link';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertTitle } from '@/components/ui/alert';
 
 function panelTitle(selected: SelectedPanel) {
   switch (selected.type) {
@@ -49,9 +50,32 @@ interface TimelineWrapperProps {
   conversation?: ConversationDetail | null;
   enableAutoScroll?: boolean;
   isPolling?: boolean;
+  error?: string | null;
+  retryConnection?: () => void;
 }
 
-function EmptyTimeline({ isPolling }: { isPolling: boolean }) {
+function EmptyTimeline({ isPolling, error, retryConnection }: { isPolling: boolean, error?: string | null, retryConnection?: () => void }) {
+  if (error) {
+    return (
+      <div className="flex flex-col gap-4 h-full justify-center items-center px-6">
+        <Alert variant="destructive" className="max-w-md">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>{error}</AlertTitle>
+        </Alert>
+        {retryConnection && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={retryConnection}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Retry Connection
+          </Button>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col gap-2 h-full justify-center items-center">
       {isPolling ? (
@@ -72,6 +96,8 @@ export function TimelineWrapper({
   conversation,
   enableAutoScroll = false,
   isPolling = false,
+  error,
+  retryConnection,
 }: TimelineWrapperProps) {
   const [selected, setSelected] = useState<SelectedPanel | null>(null);
   const [panelVisible, setPanelVisible] = useState(false);
@@ -239,7 +265,7 @@ export function TimelineWrapper({
           </div>
           <div className="p-0 flex-1 min-h-0">
             {sortedActivities.length === 0 ? (
-              <EmptyTimeline isPolling={isPolling} />
+              <EmptyTimeline isPolling={isPolling} error={error} retryConnection={retryConnection} />
             ) : enableAutoScroll ? (
               <StickToBottom
                 className="h-full [&>div]:overflow-y-auto [&>div]:scrollbar-thin [&>div]:scrollbar-thumb-muted-foreground/30 [&>div]:scrollbar-track-transparent dark:[&>div]:scrollbar-thumb-muted-foreground/50"
