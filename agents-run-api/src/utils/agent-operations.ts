@@ -49,6 +49,16 @@ export interface ErrorEvent {
 }
 
 /**
+ * Agent thinking operation event
+ */
+export interface AgentThinkingEvent {
+  type: 'agent_thinking';
+  ctx: {
+    agent: string;
+  };
+}
+
+/**
  * Status update operation event with flexible structured/unstructured data
  */
 export interface StatusUpdateEvent {
@@ -65,6 +75,7 @@ export interface StatusUpdateEvent {
 export type OperationEvent =
   | AgentInitializingEvent
   | AgentReadyEvent
+  | AgentThinkingEvent
   | CompletionEvent
   | ErrorEvent
   | StatusUpdateEvent;
@@ -95,6 +106,18 @@ export function agentReadyOp(sessionId: string, graphId: string): AgentReadyEven
     ctx: {
       sessionId,
       graphId,
+    },
+  };
+}
+
+/**
+ * Creates an agent thinking operation
+ */
+export function agentThinkingOp(agent: string): AgentThinkingEvent {
+  return {
+    type: 'agent_thinking',
+    ctx: {
+      agent,
     },
   };
 }

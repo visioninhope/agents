@@ -36,6 +36,10 @@ export interface ChatCompletionChunk {
 }
 
 export class SSEStreamHelper implements StreamHelper {
+  // Stream queuing for proper event ordering
+  private isTextStreaming: boolean = false;
+  private queuedOperations: OperationEvent[] = [];
+
   constructor(
     private stream: HonoSSEStream,
     private requestId: string,
@@ -96,11 +100,22 @@ export class SSEStreamHelper implements StreamHelper {
   async streamText(text: string, delayMs = 100): Promise<void> {
     const words = text.split(' ');
 
-    for (let i = 0; i < words.length; i++) {
-      await this.stream.sleep(delayMs);
+    // Mark that text streaming is starting
+    this.isTextStreaming = true;
+    
+    try {
+      for (let i = 0; i < words.length; i++) {
+        await this.stream.sleep(delayMs);
 
-      const content = i === 0 ? words[i] : ` ${words[i]}`;
-      await this.writeContent(content);
+        const content = i === 0 ? words[i] : ` ${words[i]}`;
+        await this.writeContent(content);
+      }
+    } finally {
+      // Mark that text streaming has finished
+      this.isTextStreaming = false;
+      
+      // Flush any queued operations now that text sequence is complete
+      await this.flushQueuedOperations();
     }
   }
 
@@ -148,6 +163,9 @@ export class SSEStreamHelper implements StreamHelper {
    * Complete the stream with finish reason and done message
    */
   async complete(finishReason = 'stop'): Promise<void> {
+    // Flush any remaining queued operations before completing
+    await this.flushQueuedOperations();
+    
     await this.writeCompletion(finishReason);
     await this.writeDone();
   }
@@ -172,7 +190,40 @@ export class SSEStreamHelper implements StreamHelper {
   }
 
   async writeOperation(operation: OperationEvent): Promise<void> {
+
+    if (operation.type === 'status_update' && operation.ctx.operationType) {
+      operation = {
+        type: operation.ctx.operationType,
+        ctx: operation.ctx.data,
+      };
+    }
+
+    // Queue operation if text is currently streaming
+    if (this.isTextStreaming) {
+      this.queuedOperations.push(operation);
+      return;
+    }
+    
+    // If not streaming, flush any queued operations first, then send this one
+    await this.flushQueuedOperations();
+    
     await this.writeData('data-operation', operation);
+  }
+
+  /**
+   * Flush all queued operations in order after text streaming completes
+   */
+  private async flushQueuedOperations(): Promise<void> {
+    if (this.queuedOperations.length === 0) {
+      return;
+    }
+    
+    const operationsToFlush = [...this.queuedOperations];
+    this.queuedOperations = []; // Clear the queue
+    
+    for (const operation of operationsToFlush) {
+      await this.writeData('data-operation', operation);
+    }
   }
 }
 
@@ -204,6 +255,10 @@ export class VercelDataStreamHelper implements StreamHelper {
   // Memory management - focused on connection completion cleanup
   private static readonly MAX_BUFFER_SIZE = 5 * 1024 * 1024; // 5MB limit (more generous during request)
   private isCompleted = false;
+  
+  // Stream queuing for proper event ordering
+  private isTextStreaming: boolean = false;
+  private queuedOperations: OperationEvent[] = [];
 
   constructor(private writer: VercelUIWriter) {}
   
@@ -279,43 +334,41 @@ export class VercelDataStreamHelper implements StreamHelper {
 
     const id = this.textId;
 
-    // Start - notify GraphSession that text streaming is starting
-    // Import is at the top of the file, we need to call it here
-    if (this.sessionId) {
-      const { graphSessionManager } = await import('./graph-session.js');
-      graphSessionManager.setTextStreaming(this.sessionId, true);
-    }
+    // Mark that text streaming is starting
+    this.isTextStreaming = true;
     
-    this.writer.write({
-      type: 'text-start',
-      id,
-    });
+    try {
+      this.writer.write({
+        type: 'text-start',
+        id,
+      });
 
-    // Deltas (optionally throttled)
-    for (let i = 0; i < words.length; i++) {
-      if (delayMs > 0) {
-        await new Promise((r) => setTimeout(r, delayMs));
+      // Deltas (optionally throttled)
+      for (let i = 0; i < words.length; i++) {
+        if (delayMs > 0) {
+          await new Promise((r) => setTimeout(r, delayMs));
+        }
+
+        const delta = i === 0 ? words[i] : ` ${words[i]}`;
+
+        this.writer.write({
+          type: 'text-delta',
+          id,
+          delta,
+        });
       }
 
-      const delta = i === 0 ? words[i] : ` ${words[i]}`;
-
+      // End
       this.writer.write({
-        type: 'text-delta',
+        type: 'text-end',
         id,
-        delta,
       });
-    }
-
-    // End
-    this.writer.write({
-      type: 'text-end',
-      id,
-    });
-    
-    // Notify GraphSession that text streaming has finished
-    if (this.sessionId) {
-      const { graphSessionManager } = await import('./graph-session.js');
-      graphSessionManager.setTextStreaming(this.sessionId, false);
+    } finally {
+      // Mark that text streaming has finished
+      this.isTextStreaming = false;
+      
+      // Flush any queued operations now that text sequence is complete
+      await this.flushQueuedOperations();
     }
   }
 
@@ -371,6 +424,9 @@ export class VercelDataStreamHelper implements StreamHelper {
   async complete(): Promise<void> {
     if (this.isCompleted) return;
 
+    // Flush any remaining queued operations before completing
+    await this.flushQueuedOperations();
+
     // Mark as completed to prevent further writes
     this.isCompleted = true;
 
@@ -387,6 +443,8 @@ export class VercelDataStreamHelper implements StreamHelper {
     this.sentItems.clear();
     this.completedItems.clear();
     this.textId = null;
+    this.queuedOperations = [];
+    this.isTextStreaming = false;
   }
 
   /**
@@ -409,11 +467,52 @@ export class VercelDataStreamHelper implements StreamHelper {
   }
 
   async writeOperation(operation: OperationEvent): Promise<void> {
+    if (this.isCompleted) {
+      console.warn('Attempted to write operation to completed stream');
+      return;
+    }
+
+    if (operation.type === 'status_update' && operation.ctx.operationType) {
+      operation = {
+        type: operation.ctx.operationType,
+        ctx: operation.ctx.data,
+      };
+    }
+
+    // Queue operation if text is currently streaming
+    if (this.isTextStreaming) {
+      this.queuedOperations.push(operation);
+      return;
+    }
+    
+    // If not streaming, flush any queued operations first, then send this one
+    await this.flushQueuedOperations();
+    
     this.writer.write({
       id: 'id' in operation ? operation.id : undefined,
       type: 'data-operation',
       data: operation,
     });
+  }
+
+  /**
+   * Flush all queued operations in order after text streaming completes
+   */
+  private async flushQueuedOperations(): Promise<void> {
+    if (this.queuedOperations.length === 0) {
+      return;
+    }
+    
+    const operationsToFlush = [...this.queuedOperations];
+    this.queuedOperations = []; // Clear the queue
+    
+    for (const operation of operationsToFlush) {
+      this.writer.write({
+        id: 'id' in operation ? operation.id : undefined,
+        type: 'data-operation',
+        data: operation,
+      });
+    }
   }
 }
 
