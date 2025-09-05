@@ -54,6 +54,7 @@ interface TimelineWrapperProps {
   error?: string | null;
   retryConnection?: () => void;
   refreshOnce?: () => Promise<{ hasNewActivity: boolean }>;
+  showConversationTracesLink?: boolean;
 }
 
 function EmptyTimeline({
@@ -109,6 +110,7 @@ export function TimelineWrapper({
   error,
   retryConnection,
   refreshOnce,
+  showConversationTracesLink = false,
 }: TimelineWrapperProps) {
   const [selected, setSelected] = useState<SelectedPanel | null>(null);
   const [panelVisible, setPanelVisible] = useState(false);
@@ -296,7 +298,7 @@ export function TimelineWrapper({
                     </Button>
                   </div>
                 )}
-                {conversation?.conversationId && (
+                {showConversationTracesLink && conversation?.conversationId && (
                   <ConversationTracesLink conversationId={conversation.conversationId} />
                 )}
               </div>
