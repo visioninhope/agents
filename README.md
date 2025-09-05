@@ -61,30 +61,12 @@ The Inkeep Agent Framework is licensed under the **Elastic License 2.0** ([ELv2]
 
 - [Install GitHub Desktop](https://docs.github.com/en/desktop/installing-and-authenticating-to-github-desktop/installing-github-desktop)
 
-## Getting Started
+## Getting Started with Local Dev
 
-Create environment variables in a new file at `agents-manage-api/.env`, `agents-run-api/.env`, `agents-manage-ui/.env`, and `packages/agents-core/.env`:
-
-Example `agents-manage-api/.env.example`:
+First, add your `ANTHROPIC_API_KEY` to an `.env` file at `agents-manage-api/.env`:
 ```
-ENVIRONMENT=development
-DB_FILE_NAME=file:local.db
-ANTHROPIC_API_KEY=
+ANTHROPIC_API_KEY=sk-ant-xyz789
 ```
-
-Example `agents-run-ui/.env.example`:
-```
-ENVIRONMENT=development
-DB_FILE_NAME=file:local.db
-ANTHROPIC_API_KEY=
-```
-
-Example `packages/agents-core/.env.example`:
-```
-DB_FILE_NAME=file:../../local.db
-```
-
-All `DB_FILE_NAME` should point to the same sqlite file.  
 
 ### Installation
 
@@ -104,10 +86,10 @@ pnpm db:push
 
 ### Running the Development Server
 
-Runs the server and local MCP server:
+At the root directory:
 
 ```bash
-pnpm dev
+ENVIRONMENT=development pnpm dev
 ```
 
 ### Examine the OpenAPI specification for the server:
@@ -129,8 +111,8 @@ This will run the test suite in parallel and create in-memory databases for each
 Execute the sample graph build/test. Observe the output. Use the sample graph defintion as a basis for your own graph defintion:
 
 ```bash
-cd agents-run-api 
-pnpm exec tsx ../examples/basic.graph.ts
+cd inkeep-chat
+pnpm exec tsx examples/graph.graph.ts
 ```
 
 ## Credential Management
