@@ -15,6 +15,7 @@ import { getLogger } from '../logger.js';
 import {
   agentInitializingOp,
   agentReadyOp,
+  agentThinkingOp,
   completionOp,
   errorOp,
 } from '../utils/agent-operations.js';
@@ -109,10 +110,7 @@ export class ExecutionHandler {
       await sseHelper.writeOperation(agentReadyOp(requestId, graphId));
 
       // Send agent thinking operation after ready
-      await sseHelper.writeData('data-operation', {
-        type: 'agent_thinking',
-        ctx: { agent: 'system' },
-      });
+      await sseHelper.writeOperation(agentThinkingOp('system'));
 
       // Check for existing task first to prevent race conditions
       const taskId = `task_${conversationId}-${requestId}`;

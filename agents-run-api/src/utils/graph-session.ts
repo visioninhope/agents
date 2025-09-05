@@ -493,11 +493,14 @@ export class GraphSession {
             }
 
             const operationToSend = {
-              type: op.type,
-              ctx: op.data,
+              type: 'status_update' as const,
+              ctx: {
+                operationType: op.type,
+                data: op.data,
+              },
             };
 
-            await streamHelper.writeData('data-operation', operationToSend);
+            await streamHelper.writeOperation(operationToSend);
           }
 
           // Store summaries for next time - use full JSON for better comparison
@@ -557,7 +560,7 @@ export class GraphSession {
         return;
       }
 
-      await streamHelper.writeData('data-operation', operation);
+      await streamHelper.writeOperation(operation);
 
       // Update state - check if still exists (could be cleaned up during async operation)
       if (this.statusUpdateState) {
