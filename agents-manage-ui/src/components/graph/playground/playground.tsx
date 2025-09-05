@@ -29,6 +29,7 @@ export const Playground = ({
     startPolling,
     stopPolling,
     retryConnection,
+    refreshOnce,
   } = useChatActivitiesPolling({
     conversationId,
   });
@@ -61,6 +62,8 @@ export const Playground = ({
             enableAutoScroll={true}
             error={error}
             retryConnection={retryConnection}
+            refreshOnce={refreshOnce}
+            showConversationTracesLink={true}
           />
         </ResizablePanelGroup>
       </div>

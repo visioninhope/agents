@@ -13,6 +13,7 @@ interface UseChatActivitiesPollingReturn {
   startPolling: () => void;
   stopPolling: () => void;
   retryConnection: () => void;
+  refreshOnce: () => Promise<{ hasNewActivity: boolean }>;
 }
 
 export const useChatActivitiesPolling = ({
@@ -28,7 +29,7 @@ export const useChatActivitiesPolling = ({
   const isComponentMountedRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const fetchChatActivities = useCallback(async () => {
+  const fetchChatActivities = useCallback(async (): Promise<ConversationDetail | null> => {
     try {
       setError(null);
 
@@ -43,7 +44,7 @@ export const useChatActivitiesPolling = ({
       if (!response.ok) {
         // If conversation doesn't exist yet, that's fine - just return
         if (response.status === 404) {
-          return;
+          return null;
         }
         throw new Error('Failed to fetch chat activities');
       }
@@ -59,10 +60,12 @@ export const useChatActivitiesPolling = ({
           setLastActivityCount(newCount);
         }
       }
+
+      return data;
     } catch (err) {
       // Don't log abort errors as they are expected when cancelling requests
       if (err instanceof Error && err.name === 'AbortError') {
-        return;
+        return null;
       }
 
       if (isComponentMountedRef.current) {
@@ -79,6 +82,7 @@ export const useChatActivitiesPolling = ({
           abortControllerRef.current = null;
         }
       }
+      throw err;
     }
   }, [conversationId, lastActivityCount]);
 
@@ -89,11 +93,15 @@ export const useChatActivitiesPolling = ({
     setIsPolling(true);
 
     // Initial fetch
-    fetchChatActivities();
+    fetchChatActivities().catch(() => {
+      // Error handling is already done in fetchChatActivities
+    });
 
     // Set up polling interval
     pollingIntervalRef.current = setInterval(() => {
-      fetchChatActivities();
+      fetchChatActivities().catch(() => {
+        // Error handling is already done in fetchChatActivities
+      });
     }, pollingInterval);
   }, [fetchChatActivities, pollingInterval]);
 
@@ -117,6 +125,14 @@ export const useChatActivitiesPolling = ({
     stopPolling();
     startPolling();
   }, [startPolling, stopPolling]);
+
+  // Refresh once - makes a single request without starting polling
+  const refreshOnce = useCallback(async (): Promise<{ hasNewActivity: boolean }> => {
+    const currentCount = chatActivities?.activities?.length || 0;
+    const data = await fetchChatActivities();
+    const newCount = data?.activities?.length || 0;
+    return { hasNewActivity: newCount > currentCount };
+  }, [fetchChatActivities, chatActivities?.activities?.length]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -157,5 +173,6 @@ export const useChatActivitiesPolling = ({
     startPolling,
     stopPolling,
     retryConnection,
+    refreshOnce,
   };
 };
