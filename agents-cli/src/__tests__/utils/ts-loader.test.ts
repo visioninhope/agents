@@ -217,7 +217,6 @@ export const complexConfig = {
       const moduleContent = `
 export const envValue = process.env.ENVIRONMENT;
 export const dbFileName = process.env.DB_FILE_NAME;
-export const tenantId = process.env.INKEEP_TENANT_ID;
 `;
       writeFileSync(testGraphFile, moduleContent);
 

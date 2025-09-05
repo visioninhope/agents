@@ -113,7 +113,6 @@ loadModule();
     if (!process.env.ENVIRONMENT) {
       envVars.ENVIRONMENT = 'test';
       envVars.DB_FILE_NAME = ':memory:'; // Use in-memory DB for CLI testing
-      envVars.INKEEP_TENANT_ID = 'test-tenant';
       envVars.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || 'test-key';
     }
 

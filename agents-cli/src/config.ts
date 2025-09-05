@@ -117,12 +117,6 @@ export async function loadConfig(configPath?: string): Promise<InkeepConfig> {
   }
 
   // Override with environment variables if present
-  if (process.env.INKEEP_TENANT_ID) {
-    config.tenantId = process.env.INKEEP_TENANT_ID;
-  }
-  if (process.env.INKEEP_PROJECT_ID) {
-    config.projectId = process.env.INKEEP_PROJECT_ID;
-  }
   if (process.env.INKEEP_MANAGEMENT_API_URL) {
     config.managementApiUrl = process.env.INKEEP_MANAGEMENT_API_URL;
   }
@@ -297,15 +291,14 @@ export async function validateConfiguration(
           '  1. Create "inkeep.config.ts" by running "inkeep init"\n' +
           '  2. Provide --config-file-path to specify a config file\n' +
           '  3. Provide both --tenant-id and --management-api-url and --execution-api-url flags\n' +
-          '  4. Set INKEEP_TENANT_ID and INKEEP_API_URL environment variables'
+          '  4. Set INKEEP_API_URL environment variable'
       );
     } else {
       throw new Error(
         `Tenant ID is missing from configuration file: ${configFile}\n` +
           'Please either:\n' +
           '  1. Update your configuration file with a tenantId\n' +
-          '  2. Provide both --tenant-id and --management-api-url and --execution-api-url flags\n' +
-          '  3. Set INKEEP_TENANT_ID environment variable'
+          '  2. Provide both --tenant-id and --management-api-url and --execution-api-url flags\n'
       );
     }
   }
@@ -330,14 +323,9 @@ export async function validateConfiguration(
 
   // Determine sources for Case 4
   const configFile = findConfigFile();
-  let tenantIdSource = configFile ? `config file (${configFile})` : 'unknown';
   let managementApiUrlSource = configFile ? `config file (${configFile})` : 'default';
   let executionApiUrlSource = configFile ? `config file (${configFile})` : 'default';
 
-  // Check if environment variables were used
-  if (process.env.INKEEP_TENANT_ID === tenantId) {
-    tenantIdSource = 'environment variable (INKEEP_TENANT_ID)';
-  }
   if (managementApiUrlFlag) {
     managementApiUrlSource = 'command-line flag (--management-api-url)';
   } else if (process.env.INKEEP_MANAGEMENT_API_URL === managementApiUrl) {
@@ -354,7 +342,7 @@ export async function validateConfiguration(
   }
 
   const sources = {
-    tenantId: tenantIdSource,
+    tenantId: `config file (${configFile})`,
     projectId: config.projectId
       ? configFile
         ? `config file (${configFile})`
