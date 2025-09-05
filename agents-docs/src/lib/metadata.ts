@@ -11,18 +11,18 @@ export function createMetadata(override: Metadata): Metadata {
   return {
     ...override,
     icons: '/icon.svg',
-    metadataBase: new URL('https://docs.companyname.com/'),
+    metadataBase: new URL('https://https://docs.inkeep.com//'),
     openGraph: {
       title: override.title ?? undefined,
       description: override.description ?? undefined,
-      url: 'https://docs.companyname.com/',
+      url: 'https://https://docs.inkeep.com//',
       //   images: "/banner.png",
-      siteName: 'CompanyName',
+      siteName: 'Inkeep Agents',
       ...override.openGraph,
     },
     twitter: {
       card: 'summary_large_image',
-      creator: '@companyname',
+      creator: '@inkeep',
       title: override.title ?? undefined,
       description: override.description ?? undefined,
       //   images: "/banner.png",

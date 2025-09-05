@@ -1,18 +1,13 @@
-import { docs, support } from "@/.source";
-import { loader } from "fumadocs-core/source";
-import navigation from "../../navigation";
-import { flattenNav, transformItems } from "@/components/sidebar/transform";
+import { docs } from '@/.source';
+import { loader } from 'fumadocs-core/source';
+import navigation from '../../navigation';
+import { flattenNav, transformItems } from '@/components/sidebar/transform';
 
 // See https://fumadocs.vercel.app/docs/headless/source-api for more info
 export const source = loader({
   // it assigns a URL to your pages
-  baseUrl: "/",
+  baseUrl: '/',
   source: docs.toFumadocsSource(),
-});
-
-export const supportSource = loader({
-  baseUrl: "/support",
-  source: support.toFumadocsSource(),
 });
 
 export const docsGroups = navigation.docs.map(transformItems);

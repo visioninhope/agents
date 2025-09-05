@@ -22,7 +22,7 @@ export function ThemeToggle({
   className,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement>): React.ReactElement {
-  const { setTheme, resolvedTheme } = useTheme();
+  const { setTheme, resolvedTheme, theme } = useTheme();
 
   const onToggle = (): void => {
     setTheme(resolvedTheme === "dark" ? "light" : "dark");

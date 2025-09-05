@@ -14,10 +14,6 @@ export default {
   plugins: [require("tailwindcss-animate")],
   theme: {
     extend: {
-      fontFamily: {
-        sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
-        mono: ['var(--font-jetbrains-mono)', 'monospace'],
-      },
       keyframes: {
         "collapse-in": {
           "0%": { height: 0 },
@@ -34,21 +30,7 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       colors: {
-        gray: colors.stone,
-        azure: {
-          50: 'oklch(0.9697 0.0148 251.16)',
-          100: 'oklch(0.9308 0.0339 253.71)',
-          200: 'oklch(0.8807 0.0599 252.33)',
-          300: 'oklch(0.8092 0.0999 249.58)',
-          400: 'oklch(0.7135 0.1524 254.03)',
-          500: 'oklch(0.6321 0.1983 259.59)',
-          600: 'oklch(0.5468 0.2329 262.71)',
-          700: 'oklch(0.4895 0.233 263.93)',
-          800: 'oklch(0.4234 0.195 264.97)',
-          900: 'oklch(0.3773 0.1488 264.94)',
-          950: 'oklch(0.2785 0.0961 267.56)',
-        },
-        stone: colors.stone,
+        gray: colors.zinc,
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {

@@ -1,18 +1,14 @@
-import {
-  defineConfig,
-  defineDocs,
-  frontmatterSchema,
-} from "fumadocs-mdx/config";
-import { z } from "zod";
-import { remarkSourceCode } from "remark-source-code";
-import { mdxSnippet } from "remark-mdx-snippets";
-import emoji from "remark-emoji";
-import html from "@shikijs/langs/html";
+import { defineConfig, defineDocs, frontmatterSchema } from 'fumadocs-mdx/config';
+import { z } from 'zod';
+import { remarkSourceCode } from 'remark-source-code';
+import { mdxSnippet } from 'remark-mdx-snippets';
+import emoji from 'remark-emoji';
+import html from '@shikijs/langs/html';
 
 // You can customise Zod schemas for frontmatter here
 // see https://fumadocs.vercel.app/docs/mdx/collections#define-docs
 export const docs = defineDocs({
-  dir: "content/docs",
+  dir: 'content/docs',
   docs: {
     schema: frontmatterSchema.extend({
       sidebarTitle: z.string().optional(),
@@ -21,30 +17,14 @@ export const docs = defineDocs({
   },
 });
 
-export const support = defineDocs({
-  dir: "./content/support",
-  docs: {
-    schema: z.object({
-      title: z.string(),
-      description: z.string(),
-    }),
-  },
-  // other options
-});
-
 export default defineConfig({
   mdxOptions: {
-    remarkPlugins: (v) => [
-      remarkSourceCode,
-      mdxSnippet,
-      [emoji, { accessible: true }],
-      ...v,
-    ],
+    remarkPlugins: (v) => [remarkSourceCode, mdxSnippet, [emoji, { accessible: true }], ...v],
     rehypeCodeOptions: {
-      inline: "tailing-curly-colon",
+      inline: 'tailing-curly-colon',
       themes: {
-        dark: "houston",
-        light: "slack-ochin",
+        dark: 'houston',
+        light: 'slack-ochin',
       },
       langs: [html],
     },
