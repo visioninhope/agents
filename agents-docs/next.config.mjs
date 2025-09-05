@@ -18,11 +18,11 @@ const config = {
   async rewrites() {
     return [
       {
-        source: "/docs/:path*.mdx",
+        source: "/:path*.mdx",
         destination: "/llms.mdx/:path*",
       },
       {
-        source: "/docs/:path*.md",
+        source: "/:path*.md",
         destination: "/llms.mdx/:path*",
       },
     ];
