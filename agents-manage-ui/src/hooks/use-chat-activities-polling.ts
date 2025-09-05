@@ -12,6 +12,7 @@ interface UseChatActivitiesPollingReturn {
   error: string | null;
   startPolling: () => void;
   stopPolling: () => void;
+  retryConnection: () => void;
 }
 
 export const useChatActivitiesPolling = ({
@@ -31,11 +32,6 @@ export const useChatActivitiesPolling = ({
     try {
       setError(null);
 
-      // Cancel any previous request
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-
       // Create new abort controller for this request
       abortControllerRef.current = new AbortController();
       const currentConversationId = conversationId; // Capture current ID
@@ -46,7 +42,9 @@ export const useChatActivitiesPolling = ({
 
       if (!response.ok) {
         // If conversation doesn't exist yet, that's fine - just return
-        if (response.status === 404) return;
+        if (response.status === 404) {
+          return;
+        }
         throw new Error('Failed to fetch chat activities');
       }
 
@@ -68,8 +66,18 @@ export const useChatActivitiesPolling = ({
       }
 
       if (isComponentMountedRef.current) {
-        console.warn('Error fetching chat activities:', err);
         setError(err instanceof Error ? err.message : 'An error occurred');
+        // Stop polling on error to prevent repeated failed requests
+        setIsPolling(false);
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+        // Cancel any pending requests
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+          abortControllerRef.current = null;
+        }
       }
     }
   }, [conversationId, lastActivityCount]);
@@ -102,6 +110,13 @@ export const useChatActivitiesPolling = ({
       abortControllerRef.current = null;
     }
   }, []);
+
+  // Retry connection - clears error and restarts polling
+  const retryConnection = useCallback(() => {
+    setError(null);
+    stopPolling();
+    startPolling();
+  }, [startPolling, stopPolling]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -141,5 +156,6 @@ export const useChatActivitiesPolling = ({
     error,
     startPolling,
     stopPolling,
+    retryConnection,
   };
 };

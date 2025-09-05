@@ -45,7 +45,7 @@ function getNumber(span: SigNozListItem, key: string, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-async function signozQuery(payload: any): Promise<SigNozResp | null> {
+async function signozQuery(payload: any): Promise<SigNozResp> {
   const logger = getLogger('signoz-query');
   try {
     logger.info({ payload }, 'SigNoz payload');
@@ -63,11 +63,31 @@ async function signozQuery(payload: any): Promise<SigNozResp | null> {
     return json;
   } catch (e) {
     logger.error({ error: e }, 'SigNoz query error');
-    return null;
+    
+    // Re-throw the error with more context for proper error handling
+    if (axios.isAxiosError(e)) {
+      if (e.code === 'ECONNREFUSED' || e.code === 'ENOTFOUND' || e.code === 'ETIMEDOUT') {
+        throw new Error(`SigNoz service unavailable: ${e.message}`);
+      }
+      if (e.response?.status === 401 || e.response?.status === 403) {
+        throw new Error(`SigNoz authentication failed: ${e.response.statusText}`);
+      }
+      if (e.response?.status === 400) {
+        throw new Error(`Invalid SigNoz query: ${e.response.statusText}`);
+      }
+      if (e.response?.status === 429) {
+        throw new Error(`SigNoz rate limit exceeded: ${e.response.statusText}`);
+      }
+      if (e.response?.status && e.response.status >= 500) {
+        throw new Error(`SigNoz server error: ${e.response.statusText}`);
+      }
+      throw new Error(`SigNoz request failed: ${e.message}`);
+    }
+    throw new Error(`SigNoz query failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
   }
 }
 
-function parseList(resp: SigNozResp | null, name: string): SigNozListItem[] {
+function parseList(resp: SigNozResp, name: string): SigNozListItem[] {
   const list = resp?.data?.result?.find((r) => r?.queryName === name)?.list ?? [];
   return Array.isArray(list) ? list : [];
 }
@@ -858,6 +878,25 @@ export async function GET(
   } catch (error) {
     const logger = getLogger('conversation-details');
     logger.error({ error }, 'Error fetching conversation details');
-    return NextResponse.json({ error: 'Failed to fetch conversation details' }, { status: 500 });
+    
+    // Provide more specific error responses based on the error type
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch conversation details';
+    
+    if (errorMessage.includes('SigNoz service unavailable')) {
+      return NextResponse.json({ error: errorMessage }, { status: 503 });
+    }
+    if (errorMessage.includes('SigNoz authentication failed')) {
+      return NextResponse.json({ error: errorMessage }, { status: 502 });
+    }
+    if (errorMessage.includes('Invalid SigNoz query')) {
+      return NextResponse.json({ error: errorMessage }, { status: 400 });
+    }
+    if (errorMessage.includes('SigNoz rate limit exceeded')) {
+      return NextResponse.json({ error: errorMessage }, { status: 429 });
+    }
+    if (errorMessage.includes('SigNoz server error')) {
+      return NextResponse.json({ error: errorMessage }, { status: 502 });
+    }
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
