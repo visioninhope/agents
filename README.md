@@ -51,7 +51,7 @@ Inkeep's multi-agent framework enables multiple specialized AI agents to collabo
 
 ## Contributing to the Inkeep Agent Framework
 
-Thank you for your interest in contributing to the Agent Framework! This document provides guidelines and information for contributors.
+Thank you for your interest in contributing to the Agent Framework! Here are guidelines and information for contributors.
 
 ### Prerequisites
 
