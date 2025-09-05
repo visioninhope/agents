@@ -40,7 +40,7 @@ const envSchema = z.object({
     .enum(['development', 'production', 'pentest', 'test'])
     .optional()
     .default('development'),
-  DB_FILE_NAME: z.string(),
+  DB_FILE_NAME: z.string().default('file:../local.db'),
   PORT: z.coerce.number().optional().default(3003),
   AGENT_BASE_URL: z.string().optional(),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).optional().default('debug'),
