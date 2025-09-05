@@ -154,11 +154,9 @@ You can also set these in your shell config or `.env` file:
 
 ```bash
 # ~/.zshrc or ~/.bashrc
-export INKEEP_TENANT_ID=test-tenant
 export INKEEP_API_URL=http://localhost:3002
 
 # Or in .env file in your project
-INKEEP_TENANT_ID=test-tenant
 INKEEP_API_URL=http://localhost:3002
 ```
 

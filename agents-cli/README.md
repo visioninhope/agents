@@ -67,7 +67,7 @@ A command-line interface for managing and interacting with Inkeep Agent Framewor
 ### Configuration Sources (priority order)
 
 1. **Command-line flags** - Highest priority (e.g., `--tenant-id`, `--api-url`)
-2. **Environment variables** - `INKEEP_TENANT_ID`, `INKEEP_API_URL`
+2. **Environment variables** - `INKEEP_API_URL`
 3. **`.env` file** - In current directory
 4. **Config file** - `inkeep.config.ts` or `.inkeeprc.ts/js`
 5. **Defaults** - Lowest priority (api-url defaults to `http://localhost:3002`)
@@ -77,14 +77,12 @@ A command-line interface for managing and interacting with Inkeep Agent Framewor
 Create a `.env` file in your project directory:
 
 ```bash
-INKEEP_TENANT_ID=your-tenant-id
 INKEEP_API_URL=http://localhost:3002
 ```
 
 Or export them in your shell:
 
 ```bash
-export INKEEP_TENANT_ID=your-tenant-id
 export INKEEP_API_URL=http://localhost:3002
 ```
 
@@ -372,7 +370,6 @@ inkeep push graph.js --url https://staging-api.example.com
 ```bash
 # Using environment variables
 export INKEEP_API_URL=https://api.example.com
-export INKEEP_TENANT_ID=prod-tenant
 inkeep list-graphs
 ```
 
@@ -435,15 +432,6 @@ agents-cli/
 ## Troubleshooting
 
 ### Common Issues
-
-**"No tenant ID configured"**
-```bash
-# Set tenant ID
-inkeep tenant your-tenant-id
-
-# Or use environment variable
-export INKEEP_TENANT_ID=your-tenant-id
-```
 
 **"Failed to fetch graphs" or connection errors**
 ```bash

@@ -133,15 +133,6 @@ export async function convertTypeScriptToJson(graphPath: string): Promise<FullGr
   const graphKey = graphExports[0];
   const graph = module[graphKey];
 
-  // Inject configuration into the graph
-  // if (typeof graph.setConfig === 'function') {
-  //   graph.setConfig(
-  //     process.env.TENANT_ID || 'inkeep',
-  //     process.env.PROJECT_ID || 'cm8q9j9l0005gs601sm5eg58l',
-  //     process.env.MANAGEMENT_API_URL || 'http://localhost:3002'
-  //   );
-  // }
-
   // Get the full graph definition using the same method as push
   return await graph.toFullGraphDefinition();
 }

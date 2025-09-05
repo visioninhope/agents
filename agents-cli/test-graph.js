@@ -95,7 +95,7 @@ export const graph = new MockAgentGraph({
   id: 'test-graph',
   name: 'Test Graph',
   description: 'A test graph for CLI testing',
-  tenantId: process.env.INKEEP_TENANT_ID || 'test-tenant',
+  tenantId: this.config.tenantId,
   defaultAgent: routerAgent,
   agents: {
     router: routerAgent,
