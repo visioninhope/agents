@@ -12,7 +12,7 @@ export function MobileSearchTrigger() {
           variant: 'ghost',
           size: 'icon-sm',
           className: 'lg:hidden text-fd-muted-foreground hover:text-fd-accent-foreground',
-        })
+        }),
       )}
     >
       <SearchIcon className="size-4" />

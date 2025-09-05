@@ -37,8 +37,10 @@
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts"
-, "content/docs/talk-to-your-agents/a2a.mdx", "content/docs/talk-to-your-agents/mcp-server.mdx"  ],
+    ".next/types/**/*.ts",
+    "content/docs/talk-to-your-agents/a2a.mdx",
+    "content/docs/talk-to-your-agents/mcp-server.mdx"
+  ],
   "exclude": [
     "node_modules"
   ]

@@ -2,20 +2,15 @@
 @import "fumadocs-ui/css/neutral.css";
 @import "fumadocs-ui/css/preset.css";
 @import "@inkeep/docskit/styles.css";
-@import "fumadocs-openapi/css/preset.css";
 
 @config "../../tailwind.config.mjs";
 
 @layer base {
   :root {
-    /* Azure blue color palette matching agent-builder */
-    --color-azure-blue: #3784ff;
-    --color-sky-blue: #69a3ff;
-    --color-crystal-blue: #d5e5ff;
-
     --color-fd-primary: hsl(219deg 100% 61%);
     --color-fd-foreground: hsl(30deg 5% 14%);
     --primary: 219deg 100% 61%;
+    --color-ikp-primary: hsl(var(--primary));
     --primary-light: 213deg 100% 71%;
     --primary-dark: 219deg 100% 61%;
     --fd-nav-height: 4rem;
@@ -24,25 +19,25 @@
     --card: 0 0% 100%;
     --card-foreground: 30 5% 14%;
     --popover: 0 0% 100%;
-    --popover-foreground: 30 5% 14%;
+    --popover-foreground: 0 0% 3.9%;
     --primary-foreground: 0 0% 98%;
-    --secondary: 30 10% 96%;
-    --secondary-foreground: 30 10% 47%;
-    --muted: 30 10% 96%;
-    --muted-foreground: 30 5% 40%;
-    --accent: 30 10% 96%;
-    --accent-foreground: 30 10% 47%;
-    --destructive: 4 85% 58%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 30 10% 90%;
-    --input: 30 10% 90%;
-    --ring: 30 10% 25%;
-    --chart-1: 23 71% 63%;
-    --chart-2: 172 40% 56%;
-    --chart-3: 19 26% 46%;
-    --chart-4: 41 75% 71%;
-    --chart-5: 35 72% 72%;
-    --radius: 0.625rem;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
     --sidebar-background: 30 10% 98%;
     --sidebar-foreground: 30 5% 14%;
     --sidebar-primary: 219deg 100% 61% / 0.1;
@@ -54,31 +49,31 @@
     --scrollbar-thumb-color: #e5e5e5;
   }
   .dark {
-    /* Azure/sky blue for dark mode */
     --primary: 213deg 100% 71%;
+    --color-ikp-primary: hsl(var(--primary)) !important;
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
-    --card: 30 5% 13%;
+    --card: 0 0% 3.9%;
     --card-foreground: 0 0% 98%;
-    --popover: 30 5% 13%;
+    --popover: 0 0% 3.9%;
     --popover-foreground: 0 0% 98%;
     --primary-foreground: 30 5% 13%;
-    --secondary: 30 3% 17%;
+    --secondary: 0 0% 14.9%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 30 3% 17%;
-    --muted-foreground: 30 5% 44%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
     --accent: 30 3% 17%;
     --accent-foreground: 0 0% 98%;
-    --destructive: 4 72% 51%;
+    --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 10%;
-    --input: 0 0% 15%;
-    --ring: 30 5% 35%;
-    --chart-1: 219 85% 61%;
-    --chart-2: 174 53% 57%;
-    --chart-3: 41 75% 71%;
-    --chart-4: 281 65% 68%;
-    --chart-5: 6 71% 66%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
     --sidebar-background: 30 5% 13%;
     --sidebar-foreground: 0 0% 98%;
     --sidebar-primary: 213deg 100% 71% / 0.1;
@@ -90,6 +85,7 @@
     --scrollbar-thumb-color: #333;
   }
 }
+
 /* this was the only way to override the primary color for dark mode */
 .dark {
   --color-fd-primary: hsl(213deg 100% 71%);
@@ -137,22 +133,10 @@ html {
 
   td {
     border-inline-start: none;
-    @apply border-gray-100 dark:border-gray-800 bg-transparent;
-  }
-
-  tr {
-    @apply bg-transparent;
-  }
-
-  tbody {
-    @apply bg-transparent;
-  }
-
-  thead {
-    @apply bg-transparent;
+    @apply border-gray-100 dark:border-gray-800;
   }
 
   table {
-    @apply border-none bg-transparent;
+    @apply border-none;
   }
 }
