@@ -38,7 +38,7 @@ loadEnvFile();
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).optional(),
   ENVIRONMENT: z.enum(['development', 'production', 'pentest', 'test']).optional(),
-  DB_FILE_NAME: z.string(),
+  DB_FILE_NAME: z.string().default('file:../local.db'),
   PORT: z.coerce.number().optional().default(3002),
   MANAGEMENT_PORT: z.coerce.number().optional().default(3002),
   AGENT_BASE_URL: z.string().optional(),
