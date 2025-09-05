@@ -72,23 +72,6 @@ DB_FILE_NAME=file:local.db
 ANTHROPIC_API_KEY=
 ```
 
-### Opt Out of Turborepo Telemetry
-
-To disable anonymous telemetry collection by Turborepo, create a `.env.local` file in the root directory:
-
-```bash
-# Create .env.local in the project root
-echo "TURBO_TELEMETRY_DISABLED=1" > .env.local
-```
-
-Alternatively, you can disable telemetry globally by running:
-```bash
-# Disable telemetry globally for all projects
-turbo telemetry disable
-```
-
-The project is already configured to automatically disable telemetry in GitHub Actions.
-
 ### Installation
 
 Install the dependencies:
@@ -867,3 +850,20 @@ In this **hub and spoke** pattern:
 - **Specialized agents** are arranged as spokes around the hub
 - **Bidirectional transfer** relationships allow agents to completely transfer control to each other
 - This pattern provides clear routing while maintaining flexibility for agents to redirect tasks when needed
+
+### Opt Out of Turborepo Telemetry
+
+To disable anonymous telemetry collection by Turborepo, create a `.env.local` file in the root directory:
+
+```bash
+# Create .env.local in the project root
+echo "TURBO_TELEMETRY_DISABLED=1" > .env.local
+```
+
+Alternatively, you can disable telemetry globally by running:
+```bash
+# Disable telemetry globally for all projects
+turbo telemetry disable
+```
+
+The project is already configured to automatically disable telemetry in GitHub Actions.
