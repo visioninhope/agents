@@ -101,7 +101,7 @@ pnpm install
 Set the DB schema:
 
 ```bash
-cd agents-run-api
+cd packages/agent-core
 pnpm db:push
 ```
 
