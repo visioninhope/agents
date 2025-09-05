@@ -2,7 +2,11 @@ import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { z } from 'zod';
 import { a2aHandler } from '../a2a/handlers.js';
-import { getAgentGraphWithDefaultAgent, getRequestExecutionContext } from '@inkeep/agents-core';
+import {
+  getAgentGraphWithDefaultAgent,
+  getRequestExecutionContext,
+  HeadersScopeSchema,
+} from '@inkeep/agents-core';
 import { getRegisteredGraph } from '../data/agentGraph.js';
 import { getRegisteredAgent } from '../data/agents.js';
 import { getLogger } from '../logger.js';
@@ -16,7 +20,9 @@ app.openapi(
   createRoute({
     method: 'get',
     path: '/.well-known/agent.json',
-    request: {},
+    request: {
+      headers: HeadersScopeSchema,
+    },
     tags: ['a2a'],
     security: [{ bearerAuth: [] }],
     responses: {

@@ -1,5 +1,5 @@
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
-import { z } from 'zod';
+import { z } from '@hono/zod-openapi';
 import {
   agentArtifactComponents,
   agentDataComponents,
@@ -34,6 +34,10 @@ export const resourceIdSchema = z
   .max(MAX_ID_LENGTH)
   .regex(URL_SAFE_ID_PATTERN, {
     message: 'ID must contain only letters, numbers, hyphens, underscores, and dots',
+  })
+  .openapi({
+    description: 'Resource identifier',
+    example: 'resource_789',
   });
 
 export const ModelSettingsSchema = z.object({
@@ -645,25 +649,72 @@ export const ProjectApiInsertSchema = ProjectInsertSchema.omit({ tenantId: true 
 export const ProjectApiUpdateSchema = ProjectUpdateSchema.omit({ tenantId: true });
 
 // === Common parameter schemas ===
-export const TenantParamsSchema = z.object({
-  tenantId: z.string(),
+export const HeadersScopeSchema = z.object({
+  'x-inkeep-tenant-id': z.string().optional().openapi({
+    description: 'Tenant identifier',
+    example: 'tenant_123',
+  }),
+  'x-inkeep-project-id': z.string().optional().openapi({
+    description: 'Project identifier',
+    example: 'project_456',
+  }),
+  'x-inkeep-graph-id': z.string().optional().openapi({
+    description: 'Graph identifier',
+    example: 'graph_789',
+  }),
 });
 
-export const TenantProjectParamsSchema = TenantParamsSchema.extend({
-  projectId: z.string(),
-});
+export const TenantParamsSchema = z
+  .object({
+    tenantId: z.string().openapi({
+      description: 'Tenant identifier',
+      example: 'tenant_123',
+    }),
+  })
+  .openapi('TenantParams');
 
-export const TenantProjectIdParamsSchema = TenantProjectParamsSchema.extend({
-  id: z.string(),
-});
+export const TenantProjectParamsSchema = z
+  .object({
+    tenantId: z.string().openapi({
+      description: 'Tenant identifier',
+      example: 'tenant_123',
+    }),
+    projectId: z.string().openapi({
+      description: 'Project identifier',
+      example: 'project_456',
+    }),
+  })
+  .openapi('TenantProjectParams');
 
-export const TenantIdParamsSchema = TenantParamsSchema.extend({
-  id: z.string(),
-});
+export const TenantProjectIdParamsSchema = z
+  .object({
+    tenantId: z.string().openapi({
+      description: 'Tenant identifier',
+      example: 'tenant_123',
+    }),
+    projectId: z.string().openapi({
+      description: 'Project identifier',
+      example: 'project_456',
+    }),
+    id: resourceIdSchema,
+  })
+  .openapi('TenantProjectIdParams');
 
-export const IdParamsSchema = z.object({
-  id: resourceIdSchema,
-});
+export const TenantIdParamsSchema = z
+  .object({
+    tenantId: z.string().openapi({
+      description: 'Tenant identifier',
+      example: 'tenant_123',
+    }),
+    id: resourceIdSchema,
+  })
+  .openapi('TenantIdParams');
+
+export const IdParamsSchema = z
+  .object({
+    id: resourceIdSchema,
+  })
+  .openapi('IdParams');
 
 // === Pagination query parameters ===
 export const PaginationQueryParamsSchema = z.object({

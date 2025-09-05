@@ -45,6 +45,8 @@ const envSchema = z.object({
   AGENT_BASE_URL: z.string().optional(),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).optional().default('debug'),
   NANGO_SECRET_KEY: z.string().optional(),
+  OPENAI_API_KEY: z.string().optional(),
+  ANTHROPIC_API_KEY: z.string(),
   INKEEP_AGENTS_RUN_BYPASS_SECRET: z.string().optional(),
 });
 

@@ -10,6 +10,7 @@ import { getLogger } from './logger.js';
 import crudRoutes from './routes/index.js';
 import { apiKeyAuth } from './middleware/auth.js';
 import oauthRoutes from './routes/oauth.js';
+import { setupOpenAPIRoutes } from './openapi.js';
 
 const app = new OpenApiHonoWithExecutionContext();
 
@@ -160,20 +161,7 @@ app.route('/tenants/:tenantId/crud', crudRoutes);
 // Mount OAuth routes - global OAuth callback endpoint
 app.route('/oauth', oauthRoutes);
 
-// OpenAPI documentation endpoint
-app.doc('/openapi.json', {
-  openapi: '3.0.0',
-  info: {
-    version: '1.0.0',
-    title: 'Inkeep Management API',
-    description: 'API for managing agents, tools, and configurations',
-  },
-  servers: [
-    {
-      url: process.env.API_URL || `http://localhost:3002`,
-      description: 'Management API Server',
-    },
-  ],
-});
+// Setup OpenAPI documentation endpoints (/openapi.json and /docs)
+setupOpenAPIRoutes(app);
 
 export default app;

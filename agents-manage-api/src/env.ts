@@ -43,8 +43,6 @@ const envSchema = z.object({
   MANAGEMENT_PORT: z.coerce.number().optional().default(3002),
   AGENT_BASE_URL: z.string().optional(),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).optional().default('debug'),
-  OPENAI_API_KEY: z.string().optional(),
-  ANTHROPIC_API_KEY: z.string(),
   NANGO_SECRET_KEY: z.string().optional(),
   INKEEP_AGENTS_MANAGE_API_SECRET: z.string().optional(),
 });

@@ -1,10 +1,10 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { OpenAPIHono } from '@hono/zod-openapi';
+import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod/v3';
-import { contextValidationMiddleware } from '@inkeep/agents-core';
+import { contextValidationMiddleware, HeadersScopeSchema } from '@inkeep/agents-core';
 
 // Type bridge for MCP SDK compatibility with Zod v4
 function createMCPSchema<T>(schema: z.ZodType<T>): any {
@@ -594,47 +594,80 @@ const createErrorResponse = (code: number, message: string, id: any = null) => (
   id,
 });
 
-app.post('/', async (c) => {
-  try {
-    // Validate parameters
-    const paramValidation = validateRequestParameters(c);
-    if (!paramValidation.valid) {
-      return paramValidation.response;
-    }
-
-    const { executionContext } = paramValidation;
-
-    const body = await c.req.json();
-    logger.info({ body, bodyKeys: Object.keys(body || {}) }, 'Parsed request body');
-
-    const isInitRequest = body.method === 'initialize';
-    const { req, res } = toReqRes(c.req.raw);
-    const validatedContext = (c as any).get('validatedContext') || {};
-    logger.info({ validatedContext }, 'Validated context');
-    logger.info({ req }, 'request');
-    if (isInitRequest) {
-      return await handleInitializationRequest(
-        body,
-        executionContext,
-        validatedContext,
-        req,
-        res,
-        c
-      );
-    } else {
-      return await handleExistingSessionRequest(body, executionContext, validatedContext, req, res);
-    }
-  } catch (e) {
-    logger.error(
-      {
-        error: e instanceof Error ? e.message : e,
-        stack: e instanceof Error ? e.stack : undefined,
+app.openapi(
+  createRoute({
+    method: 'post',
+    path: '/',
+    tags: ['MCP'],
+    summary: 'MCP Protocol',
+    description: 'Handles Model Context Protocol (MCP) JSON-RPC requests',
+    security: [{ bearerAuth: [] }],
+    request: {
+      headers: HeadersScopeSchema,
+    },
+    responses: {
+      200: {
+        description: 'MCP response',
       },
-      'MCP request error'
-    );
-    return c.json(createErrorResponse(-32603, 'Internal server error'), { status: 500 });
+      401: {
+        description: 'Unauthorized - API key authentication required',
+      },
+      404: {
+        description: 'Not Found - Agent graph not found',
+      },
+      500: {
+        description: 'Internal Server Error',
+      },
+    },
+  }),
+  async (c) => {
+    try {
+      // Validate parameters
+      const paramValidation = validateRequestParameters(c);
+      if (!paramValidation.valid) {
+        return paramValidation.response;
+      }
+
+      const { executionContext } = paramValidation;
+
+      const body = await c.req.json();
+      logger.info({ body, bodyKeys: Object.keys(body || {}) }, 'Parsed request body');
+
+      const isInitRequest = body.method === 'initialize';
+      const { req, res } = toReqRes(c.req.raw);
+      const validatedContext = (c as any).get('validatedContext') || {};
+      logger.info({ validatedContext }, 'Validated context');
+      logger.info({ req }, 'request');
+      if (isInitRequest) {
+        return await handleInitializationRequest(
+          body,
+          executionContext,
+          validatedContext,
+          req,
+          res,
+          c
+        );
+      } else {
+        return await handleExistingSessionRequest(
+          body,
+          executionContext,
+          validatedContext,
+          req,
+          res
+        );
+      }
+    } catch (e) {
+      logger.error(
+        {
+          error: e instanceof Error ? e.message : e,
+          stack: e instanceof Error ? e.stack : undefined,
+        },
+        'MCP request error'
+      );
+      return c.json(createErrorResponse(-32603, 'Internal server error'), { status: 500 });
+    }
   }
-});
+);
 
 app.get('/', async (c) => {
   logger.info('Received GET MCP request');

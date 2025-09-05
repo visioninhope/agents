@@ -9,6 +9,7 @@ import { pinoLogger } from 'hono-pino';
 import { handleApiError } from '@inkeep/agents-core';
 import { getLogger } from './logger.js';
 import { apiKeyAuth } from './middleware/api-key-auth.js';
+import { setupOpenAPIRoutes } from './openapi.js';
 import agentRoutes from './routes/agents.js';
 import chatRoutes from './routes/chat.js';
 import chatDataRoutes from './routes/chatDataStream.js';
@@ -49,7 +50,7 @@ app.use('*', async (c, next) => {
     try {
       const body = await c.req.json();
       conversationId = body?.conversationId;
-    } catch (e) {
+    } catch (_) {
       // Silently ignore parse errors for non-JSON bodies
     }
   }
@@ -226,20 +227,7 @@ app.route('/api', chatDataRoutes);
 app.route('/v1/mcp', mcpRoutes);
 app.route('/agents', agentRoutes);
 
-// OpenAPI documentation endpoint
-app.doc('/openapi.json', {
-  openapi: '3.0.0',
-  info: {
-    version: '1.0.0',
-    title: 'Inkeep Execution API',
-    description: 'API for agent execution, chat, and streaming',
-  },
-  servers: [
-    {
-      url: process.env.API_URL || `http://localhost:3003`,
-      description: 'Execution API Server',
-    },
-  ],
-});
+// Setup OpenAPI documentation endpoints (/openapi.json and /docs)
+setupOpenAPIRoutes(app);
 
 export default app;
