@@ -111,8 +111,8 @@ This will run the test suite in parallel and create in-memory databases for each
 Execute the sample graph build/test. Observe the output. Use the sample graph defintion as a basis for your own graph defintion:
 
 ```bash
-cd inkeep-chat
-pnpm exec tsx examples/graph.graph.ts
+cd agents-run-api 
+pnpm exec tsx ../examples/basic.graph.ts
 ```
 
 ## Credential Management
