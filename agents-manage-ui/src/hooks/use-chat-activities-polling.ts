@@ -23,7 +23,7 @@ export const useChatActivitiesPolling = ({
   const [error, setError] = useState<string | null>(null);
   const [lastActivityCount, setLastActivityCount] = useState(0);
 
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isComponentMountedRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
 
