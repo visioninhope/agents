@@ -1,0 +1,1476 @@
+import { type Span, SpanStatusCode, trace } from '@opentelemetry/api';
+import { generateObject, generateText, streamText, type ToolSet, tool } from 'ai';
+import { z } from 'zod';
+import type { AgentExecutionServer } from '../AgentExecutionServer.js';
+import {
+  getContextConfigById,
+  getLedgerArtifacts,
+  getCredentialReference,
+  listTaskIdsByContextId,
+  getFullGraphDefinition,
+  graphHasArtifactComponents,
+  ContextResolver,
+  TemplateEngine,
+  McpClient,
+  CredentialStuffer,
+  type McpServerConfig,
+  type Artifact,
+  type DataComponentApiInsert,
+  type McpTool,
+  type MessageContent,
+  type AgentConversationHistoryConfig,
+  type ArtifactComponentApiInsert,
+  type MCPToolConfig,
+  type Models,
+  type ModelSettings,
+} from '@inkeep/agents-core';
+import {
+  createDefaultConversationHistoryConfig,
+  getFormattedConversationHistory,
+} from '../data/conversations.js';
+
+import dbClient from '../data/db/dbClient.js';
+import { executionServer } from '../index.js';
+import { getLogger } from '../logger.js';
+import { createSpanName, getGlobalTracer, handleSpanError, forceFlushTracer } from '../tracer.js';
+import { generateToolId } from '../utils/agent-operations.js';
+import { ArtifactReferenceSchema } from '../utils/artifact-component-schema.js';
+import { jsonSchemaToZod } from '../utils/data-component-schema.js';
+import { graphSessionManager } from '../utils/graph-session.js';
+import { IncrementalStreamParser } from '../utils/incremental-stream-parser.js';
+import { ResponseFormatter } from '../utils/response-formatter.js';
+import type { StreamHelper } from '../utils/stream-helpers.js';
+import { getStreamHelper } from '../utils/stream-registry.js';
+import { createSaveToolResultTool } from './artifactTools.js';
+import { ModelFactory } from './ModelFactory.js';
+import { createDelegateToAgentTool, createTransferToAgentTool } from './relationTools.js';
+import { SystemPromptBuilder } from './SystemPromptBuilder.js';
+import { toolSessionManager } from './ToolSessionManager.js';
+import type { SystemPromptV1 } from './types.js';
+import { V1Config } from './versions/V1Config.js';
+
+/**
+ * Creates a stopWhen condition that stops when any tool call name starts with the given prefix
+ * @param prefix - The prefix to check for in tool call names
+ * @returns A function that can be used as a stopWhen condition
+ */
+export function hasToolCallWithPrefix(prefix: string) {
+  return ({ steps }: { steps: Array<any> }) => {
+    const last = steps.at(-1);
+    if (last && 'toolCalls' in last && last.toolCalls) {
+      return last.toolCalls.some((tc: any) => tc.toolName.startsWith(prefix));
+    }
+    return false;
+  };
+}
+
+const logger = getLogger('Agent');
+
+// Get tracer using centralized utility
+const tracer = getGlobalTracer();
+
+// Constants for agent configuration
+const CONSTANTS = {
+  MAX_GENERATION_STEPS: 12,
+  DEFAULT_PRIMARY_MODEL: 'anthropic/claude-4-sonnet-20250514',
+  DEFAULT_STRUCTURED_OUTPUT_MODEL: 'openai/gpt-4.1-mini-2025-04-14',
+  DEFAULT_SUMMARIZER_MODEL: 'openai/gpt-4.1-nano-2025-04-14',
+  PHASE_1_TIMEOUT_MS: 270_000, // 4.5 minutes for streaming phase 1
+  NON_STREAMING_PHASE_1_TIMEOUT_MS: 90_000, // 1.5 minutes for non-streaming phase 1
+  PHASE_2_TIMEOUT_MS: 90_000, // 1.5 minutes for phase 2 structured output
+} as const;
+
+// Helper function to handle empty model strings
+function getModelOrDefault(modelString: string | undefined, defaultModel: string): string {
+  return modelString?.trim() || defaultModel;
+}
+
+export type AgentConfig = {
+  id: string;
+  tenantId: string;
+  projectId: string;
+  graphId: string;
+  baseUrl: string;
+  apiKey?: string;
+  apiKeyId?: string;
+  name: string;
+  description: string;
+  agentPrompt: string;
+  agentRelations: AgentConfig[];
+  transferRelations: AgentConfig[];
+  delegateRelations: DelegateRelation[];
+  tools?: McpTool[];
+  artifacts?: Record<string, Artifact>;
+  functionTools?: Array<{
+    name: string;
+    description: string;
+    execute: (params: any) => Promise<any>;
+    parameters?: Record<string, any>;
+    schema?: any;
+  }>;
+  contextConfigId?: string;
+  dataComponents?: DataComponentApiInsert[];
+  artifactComponents?: ArtifactComponentApiInsert[];
+  conversationHistoryConfig?: AgentConversationHistoryConfig;
+  models?: Models;
+  stopWhen?: {
+    stepCountIs?: number;
+  };
+};
+
+export type ExternalAgentConfig = {
+  id: string;
+  name: string;
+  description: string;
+  baseUrl: string;
+};
+
+export type DelegateRelation =
+  | { type: 'internal'; config: AgentConfig }
+  | { type: 'external'; config: ExternalAgentConfig };
+
+export type ToolType = 'transfer' | 'delegation' | 'mcp' | 'tool';
+
+// LLM Generated Information as a config LLM? Separate Step?
+
+export class Agent {
+  private config: AgentConfig;
+  private systemPromptBuilder = new SystemPromptBuilder('v1', new V1Config());
+  private responseFormatter: ResponseFormatter;
+  private credentialStuffer?: CredentialStuffer;
+  private streamHelper?: StreamHelper;
+  private conversationId?: string;
+  private artifactComponents: ArtifactComponentApiInsert[] = [];
+  private isDelegatedAgent: boolean = false;
+  private contextResolver?: ContextResolver;
+
+  constructor(config: AgentConfig, framework?: AgentExecutionServer) {
+    // Store artifact components separately
+    this.artifactComponents = config.artifactComponents || [];
+
+    // Process dataComponents (now only component-type)
+    let processedDataComponents = config.dataComponents || [];
+
+    // If we have artifact components, add the default artifact data component for response hydration
+    if (
+      this.artifactComponents.length > 0 &&
+      config.dataComponents &&
+      config.dataComponents.length > 0
+    ) {
+      processedDataComponents = [
+        ArtifactReferenceSchema.getDataComponent(config.tenantId, config.projectId),
+        ...processedDataComponents,
+      ];
+    }
+
+    this.config = {
+      ...config,
+      dataComponents: processedDataComponents,
+      // Set default conversation history if not provided
+      conversationHistoryConfig:
+        config.conversationHistoryConfig || createDefaultConversationHistoryConfig(),
+    };
+    this.responseFormatter = new ResponseFormatter(config.tenantId);
+
+    // Use provided framework, fallback to global instance if available
+    const effectiveFramework = framework || executionServer;
+    if (effectiveFramework) {
+      this.contextResolver = new ContextResolver(
+        config.tenantId,
+        config.projectId,
+        dbClient,
+        effectiveFramework
+      );
+      this.credentialStuffer = new CredentialStuffer(effectiveFramework, this.contextResolver);
+    }
+  }
+
+  /**
+   * Get the maximum number of generation steps for this agent
+   * Uses agent's stopWhen.stepCountIs config or defaults to CONSTANTS.MAX_GENERATION_STEPS
+   */
+  private getMaxGenerationSteps(): number {
+    return this.config.stopWhen?.stepCountIs ?? CONSTANTS.MAX_GENERATION_STEPS;
+  }
+
+  /**
+   * Get the primary model settings for text generation and thinking
+   * Defaults to claude-4-sonnet if not specified
+   */
+  private getPrimaryModel(): ModelSettings {
+    if (!this.config.models?.base) {
+      return { model: CONSTANTS.DEFAULT_PRIMARY_MODEL };
+    }
+    return {
+      model: getModelOrDefault(this.config.models.base.model, CONSTANTS.DEFAULT_PRIMARY_MODEL),
+      providerOptions: this.config.models.base.providerOptions,
+    };
+  }
+
+  /**
+   * Get the model settings for structured output generation
+   * Defaults to GPT-4.1-mini for structured outputs if not specified
+   */
+  private getStructuredOutputModel(): ModelSettings {
+    if (!this.config.models) {
+      return { model: CONSTANTS.DEFAULT_STRUCTURED_OUTPUT_MODEL };
+    }
+
+    // Use structured output config if available, otherwise fall back to base
+    const structuredConfig = this.config.models.structuredOutput;
+    const baseConfig = this.config.models.base;
+
+    // If structured output is explicitly configured, use only its config
+    if (structuredConfig) {
+      return {
+        model: getModelOrDefault(structuredConfig.model, CONSTANTS.DEFAULT_STRUCTURED_OUTPUT_MODEL),
+        providerOptions: structuredConfig.providerOptions,
+      };
+    }
+
+    // Fall back to base model settings if structured output not configured
+    return {
+      model: getModelOrDefault(baseConfig?.model, CONSTANTS.DEFAULT_STRUCTURED_OUTPUT_MODEL),
+      providerOptions: baseConfig?.providerOptions,
+    };
+  }
+
+  /**
+   * Get the model settings for summarization tasks
+   * Defaults to gpt-4.1-nano if not specified
+   */
+  private getSummarizerModel(): ModelSettings {
+    if (!this.config.models) {
+      return { model: CONSTANTS.DEFAULT_SUMMARIZER_MODEL };
+    }
+
+    // Use summarizer config if available, otherwise fall back to base
+    const summarizerConfig = this.config.models.summarizer;
+    const baseConfig = this.config.models.base;
+
+    // If summarizer is explicitly configured, use only its config
+    if (summarizerConfig) {
+      return {
+        model: getModelOrDefault(summarizerConfig.model, CONSTANTS.DEFAULT_SUMMARIZER_MODEL),
+        providerOptions: summarizerConfig.providerOptions,
+      };
+    }
+
+    // Fall back to base model settings if summarizer not configured
+    return {
+      model: getModelOrDefault(baseConfig?.model, CONSTANTS.DEFAULT_SUMMARIZER_MODEL),
+      providerOptions: baseConfig?.providerOptions,
+    };
+  }
+
+  setConversationId(conversationId: string) {
+    this.conversationId = conversationId;
+  }
+
+  /**
+   * Set delegation status for this agent instance
+   */
+  setDelegationStatus(isDelegated: boolean) {
+    this.isDelegatedAgent = isDelegated;
+  }
+
+  /**
+   * Get streaming helper if this agent should stream to user
+   * Returns undefined for delegated agents to prevent streaming data operations to user
+   */
+  getStreamingHelper(): StreamHelper | undefined {
+    return this.isDelegatedAgent ? undefined : this.streamHelper;
+  }
+
+  /**
+   * Wraps a tool with streaming lifecycle tracking (start, complete, error) and GraphSession recording
+   */
+  private wrapToolWithStreaming(
+    toolName: string,
+    toolDefinition: any,
+    streamRequestId?: string,
+    toolType?: ToolType
+  ) {
+    if (!toolDefinition || typeof toolDefinition !== 'object' || !('execute' in toolDefinition)) {
+      return toolDefinition;
+    }
+
+    const originalExecute = toolDefinition.execute;
+    return {
+      ...toolDefinition,
+      execute: async (args: any, context?: any) => {
+        const startTime = Date.now();
+        // Use the AI SDK's toolCallId consistently instead of generating our own
+        const toolId = context?.toolCallId || generateToolId();
+
+        const activeSpan = trace.getActiveSpan();
+        if (activeSpan) {
+          activeSpan.setAttributes({
+            'conversation.id': this.conversationId,
+            'tool.purpose': toolDefinition.description || 'No description provided',
+            'ai.toolType': toolType || 'unknown',
+            'ai.agentName': this.config.name || 'unknown',
+            'graph.id': this.config.graphId || 'unknown',
+          });
+        }
+
+        // Check if this is an internal tool to skip from recording
+        const isInternalTool =
+          toolName.includes('save_tool_result') ||
+          toolName.includes('thinking_complete') ||
+          toolName.startsWith('transfer_to_') ||
+          toolName.startsWith('delegate_to_');
+
+        try {
+          const result = await originalExecute(args, context);
+          const duration = Date.now() - startTime;
+
+          // Record complete tool execution in GraphSession (skip internal tools)
+          if (streamRequestId && !isInternalTool) {
+            graphSessionManager.recordEvent(streamRequestId, 'tool_execution', this.config.id, {
+              toolName,
+              args,
+              result,
+              toolId,
+              duration,
+            });
+          }
+
+          return result;
+        } catch (error) {
+          const duration = Date.now() - startTime;
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+          // Record tool execution with error (skip internal tools)
+          if (streamRequestId && !isInternalTool) {
+            graphSessionManager.recordEvent(streamRequestId, 'tool_execution', this.config.id, {
+              toolName,
+              args,
+              result: { error: errorMessage },
+              toolId,
+              duration,
+            });
+          }
+
+          throw error;
+        }
+      },
+    };
+  }
+
+  getRelationTools(
+    runtimeContext?: {
+      contextId: string;
+      metadata: {
+        conversationId: string;
+        threadId: string;
+        streamRequestId?: string;
+        streamBaseUrl?: string;
+        apiKey?: string;
+        baseUrl?: string;
+      };
+    },
+    sessionId?: string
+  ) {
+    const { transferRelations = [], delegateRelations = [] } = this.config;
+    const createToolName = (prefix: string, agentId: string) =>
+      `${prefix}_to_${agentId.toLowerCase().replace(/\s+/g, '_')}`;
+    return Object.fromEntries([
+      ...transferRelations.map((agentConfig) => {
+        const toolName = createToolName('transfer', agentConfig.id);
+        return [
+          toolName,
+          this.wrapToolWithStreaming(
+            toolName,
+            createTransferToAgentTool({
+              transferConfig: agentConfig,
+              callingAgentId: this.config.id,
+              agent: this,
+              streamRequestId: runtimeContext?.metadata?.streamRequestId,
+            }),
+            runtimeContext?.metadata?.streamRequestId,
+            'transfer'
+          ),
+        ];
+      }),
+      ...delegateRelations.map((relation) => {
+        const toolName = createToolName('delegate', relation.config.id);
+        return [
+          toolName,
+          this.wrapToolWithStreaming(
+            toolName,
+            createDelegateToAgentTool({
+              delegateConfig: relation,
+              callingAgentId: this.config.id,
+              tenantId: this.config.tenantId,
+              projectId: this.config.projectId,
+              graphId: this.config.graphId,
+              contextId: runtimeContext?.contextId || 'default', // fallback for compatibility
+              metadata: runtimeContext?.metadata || {
+                conversationId: runtimeContext?.contextId || 'default',
+                threadId: runtimeContext?.contextId || 'default',
+                streamRequestId: runtimeContext?.metadata?.streamRequestId,
+                apiKey: runtimeContext?.metadata?.apiKey,
+              },
+              sessionId,
+              agent: this,
+            }),
+            runtimeContext?.metadata?.streamRequestId,
+            'delegation'
+          ),
+        ];
+      }),
+    ]);
+  }
+
+  async getMcpTools(sessionId?: string, streamRequestId?: string) {
+    const tools =
+      (await Promise.all(this.config.tools?.map((tool) => this.getMcpTool(tool)) || [])) || [];
+
+    // If no sessionId, return tools as-is (for system prompt building)
+    if (!sessionId) {
+      const combinedTools = tools.reduce((acc, tool) => {
+        return Object.assign(acc, tool) as ToolSet;
+      }, {} as ToolSet);
+
+      // Just wrap with streaming capability
+      const wrappedTools: ToolSet = {};
+      for (const [toolName, toolDef] of Object.entries(combinedTools)) {
+        wrappedTools[toolName] = this.wrapToolWithStreaming(
+          toolName,
+          toolDef,
+          streamRequestId,
+          'mcp'
+        );
+      }
+      return wrappedTools;
+    }
+
+    // Wrap each MCP tool to record results immediately upon execution
+    const wrappedTools: ToolSet = {};
+    for (const toolSet of tools) {
+      for (const [toolName, originalTool] of Object.entries(toolSet)) {
+        // First wrap with session management
+        const sessionWrappedTool = tool({
+          description: (originalTool as any).description,
+          inputSchema: (originalTool as any).inputSchema,
+          execute: async (args, { toolCallId }) => {
+            logger.debug({ toolName, toolCallId }, 'MCP Tool Called');
+
+            // Call the original MCP tool
+            const result = await (originalTool as any).execute(args);
+
+            // Record the result immediately in the session manager
+            toolSessionManager.recordToolResult(sessionId, {
+              toolCallId,
+              toolName,
+              args,
+              result,
+              timestamp: Date.now(),
+            });
+
+            return { result, toolCallId };
+          },
+        });
+
+        // Then wrap with streaming capability
+        wrappedTools[toolName] = this.wrapToolWithStreaming(
+          toolName,
+          sessionWrappedTool,
+          streamRequestId,
+          'mcp'
+        );
+      }
+    }
+
+    return wrappedTools;
+  }
+
+  /**
+   * Convert database McpTool to builder MCPToolConfig format
+   */
+  private convertToMCPToolConfig(tool: McpTool): MCPToolConfig {
+    return {
+      id: tool.id,
+      name: tool.name,
+      description: tool.name, // Use name as description fallback
+      serverUrl: tool.config.mcp.server.url,
+      activeTools: tool.config.mcp.activeTools,
+      mcpType: tool.config.mcp.server.url.includes('api.nango.dev') ? 'nango' : 'generic',
+      transport: tool.config.mcp.transport,
+      headers: tool.headers,
+    };
+  }
+
+  async getMcpTool(tool: McpTool) {
+    const credentialReferenceId = tool.credentialReferenceId;
+
+    // Build server config with credentials using new architecture
+    let serverConfig: McpServerConfig;
+
+    if (credentialReferenceId && this.credentialStuffer) {
+      // Database lookup to get credential store configuration
+      const credentialReference = await getCredentialReference(dbClient)({
+        scopes: {
+          tenantId: this.config.tenantId,
+          projectId: this.config.projectId,
+        },
+        id: credentialReferenceId,
+      });
+
+      if (!credentialReference) {
+        throw new Error(`Credential store not found: ${credentialReferenceId}`);
+      }
+
+      const storeReference = {
+        credentialStoreId: credentialReference.credentialStoreId,
+        retrievalParams: credentialReference.retrievalParams || {},
+      };
+
+      serverConfig = await this.credentialStuffer.buildMcpServerConfig(
+        {
+          tenantId: this.config.tenantId,
+          projectId: this.config.projectId,
+          contextConfigId: this.config.contextConfigId || undefined,
+          conversationId: this.conversationId || undefined,
+        },
+        this.convertToMCPToolConfig(tool),
+        storeReference
+      );
+    } else if (tool.headers && this.credentialStuffer) {
+      serverConfig = await this.credentialStuffer.buildMcpServerConfig(
+        {
+          tenantId: this.config.tenantId,
+          projectId: this.config.projectId,
+          contextConfigId: this.config.contextConfigId || undefined,
+          conversationId: this.conversationId || undefined,
+        },
+        this.convertToMCPToolConfig(tool)
+      );
+    } else {
+      // No credentials - build basic config
+      serverConfig = {
+        type: tool.config.mcp.transport?.type || 'streamable_http',
+        url: tool.config.mcp.server.url,
+        activeTools: tool.config.mcp.activeTools,
+      };
+    }
+
+    logger.info(
+      {
+        toolName: tool.name,
+        credentialReferenceId,
+        transportType: serverConfig.type,
+        headers: tool.headers,
+      },
+      'Built MCP server config with credentials'
+    );
+
+    // Create and connect MCP client
+    const client = new McpClient({
+      name: tool.name,
+      server: serverConfig,
+    });
+
+    await client.connect();
+    return client.tools();
+  }
+
+  getFunctionTools(streamRequestId?: string) {
+    if (!this.config.functionTools) return {};
+
+    const functionTools: ToolSet = {};
+
+    for (const funcTool of this.config.functionTools) {
+      // Convert function tool to AI SDK format and wrap with streaming
+      const aiTool = tool({
+        description: funcTool.description,
+        inputSchema: funcTool.schema || z.object({}),
+        execute: funcTool.execute,
+      });
+
+      functionTools[funcTool.name] = this.wrapToolWithStreaming(
+        funcTool.name,
+        aiTool,
+        streamRequestId,
+        'tool'
+      );
+    }
+
+    return functionTools;
+  }
+
+  /**
+   * Get resolved context using ContextResolver - will return cached data or fetch fresh data as needed
+   */
+  async getResolvedContext(
+    conversationId: string,
+    requestContext?: Record<string, unknown>
+  ): Promise<Record<string, unknown> | null> {
+    try {
+      if (!this.config.contextConfigId) {
+        logger.debug({ graphId: this.config.graphId }, 'No context config found for graph');
+        return null;
+      }
+
+      // Get context configuration
+      const contextConfig = await getContextConfigById(dbClient)({
+        scopes: { tenantId: this.config.tenantId, projectId: this.config.projectId },
+        id: this.config.contextConfigId,
+      });
+      if (!contextConfig) {
+        logger.warn({ contextConfigId: this.config.contextConfigId }, 'Context config not found');
+        return null;
+      }
+
+      if (!this.contextResolver) {
+        throw new Error('Context resolver not found');
+      }
+
+      // Resolve context with 'invocation' trigger to ensure fresh data for invocation definitions
+      const result = await this.contextResolver.resolve(contextConfig, {
+        triggerEvent: 'invocation',
+        conversationId,
+        requestContext: requestContext || {},
+        tenantId: this.config.tenantId,
+      });
+
+      // Add built-in variables to resolved context
+      const contextWithBuiltins = {
+        ...result.resolvedContext,
+        $now: new Date().toISOString(),
+        $env: process.env,
+      };
+
+      logger.debug(
+        {
+          conversationId,
+          contextConfigId: contextConfig.id,
+          resolvedKeys: Object.keys(contextWithBuiltins),
+          cacheHits: result.cacheHits.length,
+          cacheMisses: result.cacheMisses.length,
+          fetchedDefinitions: result.fetchedDefinitions.length,
+          errors: result.errors.length,
+        },
+        'Context resolved for agent'
+      );
+
+      return contextWithBuiltins;
+    } catch (error) {
+      logger.error(
+        {
+          conversationId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        'Failed to get resolved context'
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Get the graph prompt for this agent's graph
+   */
+  private async getGraphPrompt(): Promise<string | undefined> {
+    try {
+      const graphDefinition = await getFullGraphDefinition(dbClient)({
+        scopes: {
+          tenantId: this.config.tenantId,
+          projectId: this.config.projectId,
+        },
+        graphId: this.config.graphId,
+      });
+
+      return graphDefinition?.graphPrompt || undefined;
+    } catch (error) {
+      logger.warn(
+        {
+          graphId: this.config.graphId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        'Failed to get graph prompt'
+      );
+      return undefined;
+    }
+  }
+
+  /**
+   * Check if any agent in the graph has artifact components configured
+   */
+  private async hasGraphArtifactComponents(): Promise<boolean> {
+    try {
+      const graphDefinition = await getFullGraphDefinition(dbClient)({
+        scopes: {
+          tenantId: this.config.tenantId,
+          projectId: this.config.projectId,
+        },
+        graphId: this.config.graphId,
+      });
+
+      if (!graphDefinition) {
+        return false;
+      }
+
+      // Check if artifactComponents exists and has any entries
+      return !!(
+        graphDefinition.artifactComponents &&
+        Object.keys(graphDefinition.artifactComponents).length > 0
+      );
+    } catch (error) {
+      logger.warn(
+        {
+          graphId: this.config.graphId,
+          tenantId: this.config.tenantId,
+          projectId: this.config.projectId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        'Failed to check graph artifact components, assuming none exist'
+      );
+      // Fallback to current agent's artifact components if graph query fails
+      return this.artifactComponents.length > 0;
+    }
+  }
+
+  /**
+   * Build adaptive system prompt for Phase 2 structured output generation
+   * based on configured data components and artifact components across the graph
+   */
+  private async buildPhase2SystemPrompt(): Promise<string> {
+    const hasDataComponents = this.config.dataComponents && this.config.dataComponents.length > 0;
+    const hasArtifactComponents = await this.hasGraphArtifactComponents();
+
+    if (hasDataComponents && hasArtifactComponents) {
+      return `Generate the final structured JSON response using the configured data components. Intersperse artifact references throughout the dataComponents array to support each piece of information with evidence from the research above. Use exact artifact_id and task_id values from the tool outputs - never make up or modify these IDs.
+
+Key requirements:
+- Mix artifact references throughout your dataComponents array
+- Each artifact reference must use EXACT IDs from tool outputs
+- Reference artifacts that directly support the adjacent information
+- Follow the pattern: Data → Supporting Artifact → Next Data → Next Artifact`;
+    }
+
+    if (hasDataComponents && !hasArtifactComponents) {
+      return `Generate the final structured JSON response using the configured data components. Organize the information from the research above into the appropriate structured format based on the available component schemas.
+
+Key requirements:
+- Use the exact component structure and property names
+- Fill in all relevant data from the research
+- Ensure data is organized logically and completely`;
+    }
+
+    if (!hasDataComponents && hasArtifactComponents) {
+      return `Generate the final structured response with artifact references based on the research above. Use the artifact reference component to cite relevant information with exact artifact_id and task_id values from the tool outputs.
+
+Key requirements:
+- Use exact artifact_id and task_id from tool outputs
+- Reference artifacts that support your response
+- Never make up or modify artifact IDs`;
+    }
+
+    // Fallback case (shouldn't happen in normal operation since we check hasStructuredOutput)
+    return `Generate the final response based on the research above.`;
+  }
+
+  private async buildSystemPrompt(
+    runtimeContext?: {
+      contextId: string;
+      metadata: {
+        conversationId: string;
+        threadId: string;
+        streamRequestId?: string;
+        streamBaseUrl?: string;
+      };
+    },
+    excludeDataComponents: boolean = false
+  ): Promise<string> {
+    // Get resolved context using ContextResolver
+    const conversationId = runtimeContext?.metadata?.conversationId || runtimeContext?.contextId;
+
+    // Set conversation ID if available
+    if (conversationId) {
+      this.setConversationId(conversationId);
+    }
+
+    const resolvedContext = conversationId ? await this.getResolvedContext(conversationId) : null;
+
+    // Process agent prompt with context
+    let processedPrompt = this.config.agentPrompt;
+    if (resolvedContext) {
+      try {
+        processedPrompt = TemplateEngine.render(
+          this.config.agentPrompt,
+          resolvedContext,
+          { strict: false, preserveUnresolved: false }
+        );
+      } catch (error) {
+        logger.error(
+          {
+            conversationId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          },
+          'Failed to process agent prompt with context, using original'
+        );
+        processedPrompt = this.config.agentPrompt;
+      }
+    }
+
+    // Get MCP tools, function tools, and relational tools
+    const streamRequestId = runtimeContext?.metadata?.streamRequestId;
+    const mcpTools = await this.getMcpTools(undefined, streamRequestId);
+    const functionTools = this.getFunctionTools(streamRequestId);
+    const relationTools = this.getRelationTools(runtimeContext);
+
+    // Convert ToolSet objects to ToolData array format for system prompt
+    const allTools = { ...mcpTools, ...functionTools, ...relationTools };
+
+    const toolDefinitions = Object.entries(allTools).map(([name, tool]) => ({
+      name,
+      description: (tool as any).description || '',
+      inputSchema: (tool as any).inputSchema || (tool as any).parameters || {},
+      usageGuidelines:
+        name.startsWith('transfer_to_') || name.startsWith('delegate_to_')
+          ? `Use this tool to ${name.startsWith('transfer_to_') ? 'transfer' : 'delegate'} to another agent when appropriate.`
+          : 'Use this tool when appropriate for the task at hand.',
+    }));
+
+    const referenceTaskIds: string[] = await listTaskIdsByContextId(dbClient)({
+      contextId: runtimeContext?.contextId || '',
+    });
+
+    const referenceArtifacts: Artifact[] = [];
+    for (const taskId of referenceTaskIds) {
+      const artifacts = await getLedgerArtifacts(dbClient)({
+        scopes: {
+          tenantId: this.config.tenantId,
+          projectId: this.config.projectId,
+        },
+        taskId: taskId,
+      });
+      referenceArtifacts.push(...artifacts);
+    }
+
+    // Use component dataComponents for system prompt (artifacts already separated in constructor)
+    const componentDataComponents = excludeDataComponents ? [] : this.config.dataComponents || [];
+
+    // Use thinking/preparation mode when we have data components but are excluding them (Phase 1)
+    const isThinkingPreparation =
+      this.config.dataComponents && this.config.dataComponents.length > 0 && excludeDataComponents;
+
+    // Get graph prompt for additional context
+    let graphPrompt = await this.getGraphPrompt();
+
+    // Process graph prompt with context variables
+    if (graphPrompt && resolvedContext) {
+      try {
+        graphPrompt = TemplateEngine.render(graphPrompt, resolvedContext, {
+          strict: false,
+          preserveUnresolved: false,
+        });
+      } catch (error) {
+        logger.error(
+          {
+            conversationId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          },
+          'Failed to process graph prompt with context, using original'
+        );
+        // graphPrompt remains unchanged if processing fails
+      }
+    }
+
+    const config: SystemPromptV1 = {
+      corePrompt: processedPrompt,
+      graphPrompt,
+      tools: toolDefinitions,
+      dataComponents: componentDataComponents,
+      artifacts: referenceArtifacts,
+      isThinkingPreparation,
+      hasTransferRelations: (this.config.transferRelations?.length ?? 0) > 0,
+      hasDelegateRelations: (this.config.delegateRelations?.length ?? 0) > 0,
+    };
+    return await this.systemPromptBuilder.buildSystemPrompt(config);
+  }
+
+  private getArtifactTools() {
+    return tool({
+      description:
+        'Call this tool to get the artifact with the given artifactId. Only retrieve this when the description of the artifact is insufficient to understand the artifact and you need to see the actual artifact for more context. Please refrain from using this tool unless absolutely necessary.',
+      inputSchema: z.object({
+        artifactId: z.string().describe('The unique identifier of the artifact to get.'),
+      }),
+      execute: async ({ artifactId }) => {
+        logger.info({ artifactId }, 'get_artifact executed');
+        const artifact = await getLedgerArtifacts(dbClient)({
+          scopes: {
+            tenantId: this.config.tenantId,
+            projectId: this.config.projectId,
+          },
+          artifactId,
+        });
+        if (!artifact) {
+          throw new Error(`Artifact ${artifactId} not found`);
+        }
+        return { artifact: artifact[0] };
+      },
+    });
+  }
+
+  // Create the thinking_complete tool to mark end of planning phase
+  private createThinkingCompleteTool(): any {
+    return tool({
+      description:
+        'Call when research and planning is complete, ready to generate structured response. This marks the end of the thinking phase.',
+      inputSchema: z.object({
+        complete: z.boolean().describe('Set to true when research is finished'),
+      }),
+      execute: async (params) => params,
+    });
+  }
+
+  // Provide a default tool set that is always available to the agent.
+  private async getDefaultTools(sessionId?: string, streamRequestId?: string): Promise<ToolSet> {
+    const defaultTools: ToolSet = {};
+
+    // Add get_reference_artifact if any agent in the graph has artifact components
+    // This enables cross-agent artifact collaboration within the same graph
+    if (await this.graphHasArtifactComponents()) {
+      defaultTools.get_reference_artifact = this.getArtifactTools();
+    }
+
+    // Only add save_tool_result if this specific agent has artifact components
+    if (this.artifactComponents.length > 0) {
+      defaultTools.save_tool_result = createSaveToolResultTool(
+        sessionId,
+        streamRequestId,
+        this.config.id,
+        this.artifactComponents
+      );
+    }
+
+    // Add thinking_complete tool if we have structured output components
+    const hasStructuredOutput = this.config.dataComponents && this.config.dataComponents.length > 0;
+
+    if (hasStructuredOutput) {
+      const thinkingCompleteTool = this.createThinkingCompleteTool();
+      if (thinkingCompleteTool) {
+        defaultTools.thinking_complete = this.wrapToolWithStreaming(
+          'thinking_complete',
+          thinkingCompleteTool,
+          streamRequestId,
+          'tool'
+        );
+      }
+    }
+
+    return defaultTools;
+  }
+
+  // Check if any agents in the graph have artifact components
+  private async graphHasArtifactComponents(): Promise<boolean> {
+    try {
+      return await graphHasArtifactComponents(dbClient)({
+        scopes: {
+          tenantId: this.config.tenantId,
+          projectId: this.config.projectId,
+        },
+        graphId: this.config.graphId,
+      });
+    } catch (error) {
+      logger.error(
+        { error, graphId: this.config.graphId },
+        'Failed to check graph artifact components'
+      );
+      return false;
+    }
+  }
+
+  async generate(
+    userMessage: string,
+    runtimeContext?: {
+      contextId: string;
+      metadata: {
+        conversationId: string;
+        threadId: string;
+        taskId: string;
+        streamRequestId: string;
+      };
+    }
+  ) {
+    return tracer.startActiveSpan(createSpanName('agent.generate'), async (span) => {
+      // Create tool session for this execution outside try blocks
+      const contextId = runtimeContext?.contextId || 'default';
+      const taskId = runtimeContext?.metadata?.taskId || 'unknown';
+      const sessionId = toolSessionManager.createSession(
+        this.config.tenantId,
+        this.config.projectId,
+        contextId,
+        taskId
+      );
+
+      try {
+        // Set streaming helper from registry if available
+        const streamRequestId = runtimeContext?.metadata?.streamRequestId;
+        this.streamHelper = streamRequestId ? getStreamHelper(streamRequestId) : undefined;
+        const conversationId = runtimeContext?.metadata?.conversationId;
+
+        // Set conversation ID if available
+        if (conversationId) {
+          this.setConversationId(conversationId);
+        }
+
+        // Load all tools and both system prompts in parallel
+        // Note: getDefaultTools needs to be called after streamHelper is set above
+        const [
+          mcpTools,
+          systemPrompt,
+          thinkingSystemPrompt,
+          functionTools,
+          relationTools,
+          defaultTools,
+        ] = await tracer.startActiveSpan(
+          createSpanName('agent.load_tools'),
+          {
+            attributes: {
+              'agent.name': this.config.name,
+              'session.id': sessionId || 'none',
+            },
+          },
+          async (childSpan: Span) => {
+            try {
+              const result = await Promise.all([
+                this.getMcpTools(sessionId, streamRequestId),
+                this.buildSystemPrompt(runtimeContext, false), // Normal prompt with data components
+                this.buildSystemPrompt(runtimeContext, true), // Thinking prompt without data components
+                Promise.resolve(this.getFunctionTools(streamRequestId)),
+                Promise.resolve(this.getRelationTools(runtimeContext, sessionId)),
+                this.getDefaultTools(sessionId, streamRequestId),
+              ]);
+
+              childSpan.setStatus({ code: SpanStatusCode.OK });
+              return result;
+            } catch (err) {
+              // Use helper function for consistent error handling
+              handleSpanError(childSpan, err);
+              throw err;
+            } finally {
+              childSpan.end();
+              // Force flush after critical tool loading span
+              await forceFlushTracer();
+            }
+          }
+        );
+
+        // Combine all tools for AI SDK
+        const allTools = {
+          ...mcpTools,
+          ...functionTools,
+          ...relationTools,
+          ...defaultTools,
+        };
+
+        // Get conversation history
+        let conversationHistory = '';
+        const historyConfig =
+          this.config.conversationHistoryConfig ?? createDefaultConversationHistoryConfig();
+
+        if (historyConfig && historyConfig.mode !== 'none') {
+          if (historyConfig.mode === 'full') {
+            conversationHistory = await getFormattedConversationHistory({
+              tenantId: this.config.tenantId,
+              projectId: this.config.projectId,
+              conversationId: contextId,
+              currentMessage: userMessage,
+              options: historyConfig,
+              filters: {},
+            });
+          } else if (historyConfig.mode === 'scoped') {
+            conversationHistory = await getFormattedConversationHistory({
+              tenantId: this.config.tenantId,
+              projectId: this.config.projectId,
+              conversationId: contextId,
+              currentMessage: userMessage,
+              options: historyConfig,
+              filters: {
+                agentId: this.config.id,
+                taskId: taskId,
+              },
+            });
+          }
+        }
+
+        // Use the primary model for text generation
+        const primaryModelSettings = this.getPrimaryModel();
+        const modelSettings = ModelFactory.prepareGenerationConfig(primaryModelSettings);
+        let response: any;
+        let textResponse: string;
+
+        // Check if we have structured output components
+        const hasStructuredOutput =
+          this.config.dataComponents && this.config.dataComponents.length > 0;
+
+        // Phase 1: Stream only if no structured output needed
+        const shouldStreamPhase1 = this.getStreamingHelper() && !hasStructuredOutput;
+
+        // Extract maxDuration from config and convert to milliseconds, or use defaults
+        const timeoutMs = modelSettings.maxDuration
+          ? modelSettings.maxDuration * 1000
+          : shouldStreamPhase1
+            ? CONSTANTS.PHASE_1_TIMEOUT_MS
+            : CONSTANTS.NON_STREAMING_PHASE_1_TIMEOUT_MS;
+
+        // Build messages for Phase 1 - use thinking prompt if structured output needed
+        const phase1SystemPrompt = hasStructuredOutput ? thinkingSystemPrompt : systemPrompt;
+        const messages: any[] = [];
+        messages.push({ role: 'system', content: phase1SystemPrompt });
+
+        if (conversationHistory.trim() !== '') {
+          messages.push({ role: 'user', content: conversationHistory });
+        }
+        messages.push({
+          role: 'user',
+          content: userMessage,
+        });
+
+        // ----- PHASE 1: Planning with tools -----
+
+        if (shouldStreamPhase1) {
+          // Streaming Phase 1: Natural text + tools (no structured output needed)
+          const streamConfig = {
+            ...modelSettings,
+            toolChoice: 'auto' as const, // Allow natural text + tools
+          };
+
+          // Use streamText for Phase 1 (text-only responses)
+          const streamResult = streamText({
+            ...streamConfig,
+            messages,
+            tools: allTools,
+            stopWhen: ({ steps }) => {
+              const last = steps.at(-1);
+              if (last && 'toolCalls' in last && last.toolCalls) {
+                return last.toolCalls.some((tc: any) => tc.toolName.startsWith('transfer_to_'));
+              }
+              // Safety cap at configured max steps
+              return steps.length >= this.getMaxGenerationSteps();
+            },
+            experimental_telemetry: {
+              isEnabled: true,
+              functionId: this.config.id,
+              recordInputs: true,
+              recordOutputs: true,
+            },
+            abortSignal: AbortSignal.timeout(timeoutMs),
+          });
+
+          // Create incremental parser that will format and stream to user
+          const streamHelper = this.getStreamingHelper();
+          if (!streamHelper) {
+            throw new Error('Stream helper is unexpectedly undefined in streaming context');
+          }
+          const parser = new IncrementalStreamParser(streamHelper, this.config.tenantId, contextId);
+
+          // Process the stream - text only (no structured output in Phase 1)
+          // Note: stopWhen will automatically stop on transfer_to_
+          for await (const textChunk of streamResult.textStream) {
+            await parser.processTextChunk(textChunk);
+          }
+
+          // Finalize the stream
+          await parser.finalize();
+
+          // Get the complete result for A2A protocol
+          response = await streamResult;
+
+          // Build formattedContent from collected parts
+          const collectedParts = parser.getCollectedParts();
+          if (collectedParts.length > 0) {
+            response.formattedContent = {
+              parts: collectedParts.map((part) => ({
+                kind: part.kind,
+                ...(part.kind === 'text' && { text: part.text }),
+                ...(part.kind === 'data' && { data: part.data }),
+              })),
+            };
+          }
+        } else {
+          // Non-streaming Phase 1
+          let genConfig: any;
+          if (hasStructuredOutput) {
+            genConfig = {
+              ...modelSettings,
+              toolChoice: 'required' as const, // Force tool usage, prevent text generation
+            };
+          } else {
+            genConfig = {
+              ...modelSettings,
+              toolChoice: 'auto' as const, // Allow both tools and text generation
+            };
+          }
+
+          // Use generateText for Phase 1 planning
+          response = await generateText({
+            ...genConfig,
+            messages,
+            tools: allTools,
+            stopWhen: ({ steps }) => {
+              const last = steps.at(-1);
+              if (last && 'toolCalls' in last && last.toolCalls) {
+                return last.toolCalls.some(
+                  (tc: any) =>
+                    tc.toolName.startsWith('transfer_to_') || tc.toolName === 'thinking_complete'
+                );
+              }
+              // Safety cap at configured max steps
+              return steps.length >= this.getMaxGenerationSteps();
+            },
+            experimental_telemetry: {
+              isEnabled: true,
+              functionId: this.config.id,
+              recordInputs: true,
+              recordOutputs: true,
+              metadata: {
+                phase: 'planning',
+              },
+            },
+            abortSignal: AbortSignal.timeout(timeoutMs),
+          });
+        }
+
+        // Resolve steps Promise so task handler can access the array properly
+        if (response.steps) {
+          const resolvedSteps = await response.steps;
+          response = { ...response, steps: resolvedSteps };
+        }
+
+        // ----- PHASE 2: Structured Output Generation -----
+        if (hasStructuredOutput && !hasToolCallWithPrefix('transfer_to_')(response)) {
+          // Check if thinking_complete was called (successful Phase 1)
+          const thinkingCompleteCall = response.steps
+            ?.flatMap((s: any) => s.toolCalls || [])
+            ?.find((tc: any) => tc.toolName === 'thinking_complete');
+
+          if (thinkingCompleteCall) {
+            // Build reasoning flow from Phase 1 steps
+            const reasoningFlow: any[] = [];
+            if (response.steps) {
+              response.steps.forEach((step: any) => {
+                // Add tool calls and results as formatted messages
+                if (step.toolCalls && step.toolResults) {
+                  step.toolCalls.forEach((call: any, index: number) => {
+                    const result = step.toolResults[index];
+                    if (result) {
+                      const storedResult = toolSessionManager.getToolResult(
+                        sessionId,
+                        result.toolCallId
+                      );
+                      const toolName = storedResult?.toolName || call.toolName;
+
+                      // Skip tool_thinking tool
+                      if (toolName === 'thinking_complete') {
+                        return;
+                      }
+
+                      // Special handling for save_artifact_tool and save_tool_result
+                      if (toolName === 'save_artifact_tool' || toolName === 'save_tool_result') {
+                        logger.info({ result }, 'save_artifact_tool or save_tool_result');
+                        if (result.output.artifacts) {
+                          for (const artifact of result.output.artifacts) {
+                            const artifactId = artifact?.artifactId || 'N/A';
+                            const taskId = artifact?.taskId || 'N/A';
+                            const summaryData = artifact?.summaryData || {};
+
+                            const formattedArtifact = `## Artifact Saved
+
+    **Artifact ID:** ${artifactId}
+    **Task ID:** ${taskId}
+
+    ### Summary
+    ${typeof summaryData === 'string' ? summaryData : JSON.stringify(summaryData, null, 2)}
+    `;
+
+                            reasoningFlow.push({
+                              role: 'assistant',
+                              content: formattedArtifact,
+                            });
+                          }
+                        }
+                        return;
+                      }
+
+                      // Default formatting for all other tools
+                      const actualResult = storedResult?.result || result.result || result;
+                      const actualArgs = storedResult?.args || call.args;
+
+                      const input = actualArgs ? JSON.stringify(actualArgs, null, 2) : 'No input';
+                      const output =
+                        typeof actualResult === 'string'
+                          ? actualResult
+                          : JSON.stringify(actualResult, null, 2);
+
+                      const formattedResult = `## Tool: ${call.toolName}
+
+### Input
+${input}
+
+### Output
+${output}`;
+
+                      reasoningFlow.push({
+                        role: 'assistant',
+                        content: formattedResult,
+                      });
+                    }
+                  });
+                }
+              });
+            }
+
+            // Build component schemas using reusable classes
+            const componentSchemas: z.ZodType<any>[] = [];
+
+            // Add data component schemas
+            if (this.config.dataComponents && this.config.dataComponents.length > 0) {
+              this.config.dataComponents.forEach((dc) => {
+                const propsSchema = jsonSchemaToZod(dc.props);
+                componentSchemas.push(
+                  z.object({
+                    id: z.string(),
+                    name: z.literal(dc.name),
+                    props: propsSchema,
+                  })
+                );
+              });
+            }
+
+            // Add artifact reference schema
+            if (this.artifactComponents.length > 0) {
+              componentSchemas.push(ArtifactReferenceSchema.getSchema());
+            }
+
+            let dataComponentsSchema: z.ZodType<any>;
+            if (componentSchemas.length === 1) {
+              dataComponentsSchema = componentSchemas[0];
+            } else {
+              dataComponentsSchema = z.union(
+                componentSchemas as [z.ZodType<any>, z.ZodType<any>, ...z.ZodType<any>[]]
+              );
+            }
+
+            // Phase 2: Generate structured output
+            const structuredModelSettings = ModelFactory.prepareGenerationConfig(
+              this.getStructuredOutputModel()
+            );
+            const phase2TimeoutMs = structuredModelSettings.maxDuration
+              ? structuredModelSettings.maxDuration * 1000
+              : CONSTANTS.PHASE_2_TIMEOUT_MS;
+
+            const structuredResponse = await generateObject({
+              ...structuredModelSettings,
+              messages: [
+                { role: 'user', content: userMessage },
+                ...reasoningFlow,
+                {
+                  role: 'system',
+                  content: await this.buildPhase2SystemPrompt(),
+                },
+              ],
+              schema: z.object({
+                dataComponents: z.array(dataComponentsSchema),
+              }),
+              experimental_telemetry: {
+                isEnabled: true,
+                functionId: this.config.id,
+                recordInputs: true,
+                recordOutputs: true,
+                metadata: {
+                  phase: 'structured_generation',
+                },
+              },
+              abortSignal: AbortSignal.timeout(phase2TimeoutMs),
+            });
+
+            // Merge structured output into response
+            response = {
+              ...response,
+              object: structuredResponse.object,
+            };
+            textResponse = JSON.stringify(structuredResponse.object, null, 2);
+          } else {
+            textResponse = response.text || '';
+          }
+        } else {
+          textResponse = response.steps[response.steps.length - 1].text || '';
+        }
+
+        // Mark span as successful
+        span.setStatus({ code: SpanStatusCode.OK });
+        span.end();
+        
+        // Force flush after critical agent generation span
+        await forceFlushTracer();
+
+        // Format response - handle object vs text responses differently
+        // Only format if we don't already have formattedContent from streaming
+        let formattedContent: MessageContent | null = response.formattedContent || null;
+
+        if (!formattedContent) {
+          if (response.object) {
+            // For object responses, replace artifact markers and convert to parts array
+            formattedContent = await this.responseFormatter.formatObjectResponse(
+              response.object,
+              contextId
+            );
+          } else if (textResponse) {
+            // For text responses, apply artifact marker formatting to create text/data parts
+            formattedContent = await this.responseFormatter.formatResponse(textResponse, contextId);
+          }
+        }
+
+        const formattedResponse = {
+          ...response,
+          formattedContent: formattedContent,
+        };
+
+        // Record agent generation in GraphSession
+        if (streamRequestId) {
+          const generationType = response.object ? 'object_generation' : 'text_generation';
+
+          graphSessionManager.recordEvent(streamRequestId, 'agent_generate', this.config.id, {
+            parts: (formattedContent?.parts || []).map((part) => ({
+              type:
+                part.kind === 'text'
+                  ? ('text' as const)
+                  : part.kind === 'data'
+                    ? ('tool_result' as const)
+                    : ('text' as const),
+              content: part.text || JSON.stringify(part.data),
+            })),
+            generationType,
+          });
+        }
+
+        // Clean up session after completion
+        toolSessionManager.endSession(sessionId);
+
+        return formattedResponse;
+      } catch (error) {
+        // Clean up session on error
+        toolSessionManager.endSession(sessionId);
+
+        // Record exception and mark span as error
+        span.recordException(error as Error);
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: (error as Error).message,
+        });
+        span.end();
+        
+        // Force flush after error to ensure error telemetry is sent
+        await forceFlushTracer();
+
+        getLogger('Agent').error(error as Error, 'Agent generate error');
+        throw error;
+      }
+    });
+  }
+}

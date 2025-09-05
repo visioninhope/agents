@@ -1,0 +1,292 @@
+import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
+import { z } from 'zod';
+import {
+  createApiKey,
+  deleteApiKey,
+  getApiKeyById,
+  listApiKeysPaginated,
+  updateApiKey,
+  ApiKeyApiInsertSchema,
+  ApiKeyApiSelectSchema,
+  ApiKeyApiUpdateSchema,
+  ApiKeyApiCreationResponseSchema,
+  ErrorResponseSchema,
+  IdParamsSchema,
+  ListResponseSchema,
+  PaginationQueryParamsSchema,
+  SingleResponseSchema,
+  TenantProjectParamsSchema,
+  generateApiKey,
+} from '@inkeep/agents-core';
+import { commonGetErrorResponses, createApiError } from '@inkeep/agents-core';
+import dbClient from '../data/db/dbClient.js';
+
+const app = new OpenAPIHono();
+
+app.openapi(
+  createRoute({
+    method: 'get',
+    path: '/',
+    summary: 'List API Keys',
+    description: 'List all API keys for a tenant with optional pagination',
+    operationId: 'list-api-keys',
+    tags: ['CRUD API Keys'],
+    request: {
+      params: TenantProjectParamsSchema,
+      query: PaginationQueryParamsSchema.extend({
+        graphId: z.string().optional().describe('Filter by graph ID'),
+      }),
+    },
+    responses: {
+      200: {
+        description: 'List of API keys retrieved successfully',
+        content: {
+          'application/json': {
+            schema: ListResponseSchema(ApiKeyApiSelectSchema),
+          },
+        },
+      },
+      ...commonGetErrorResponses,
+    },
+  }),
+  async (c) => {
+    const { tenantId, projectId } = c.req.valid('param');
+    const page = Number(c.req.query('page')) || 1;
+    const limit = Math.min(Number(c.req.query('limit')) || 10, 100);
+    const graphId = c.req.query('graphId');
+
+    const result = await listApiKeysPaginated(dbClient)({
+      scopes: { tenantId, projectId },
+      pagination: { page, limit },
+      graphId,
+    });
+    // Remove sensitive fields from response
+    const sanitizedData = result.data.map(({ keyHash, tenantId, projectId, ...apiKey }) => apiKey);
+
+    return c.json({
+      data: sanitizedData,
+      pagination: result.pagination,
+    });
+  }
+);
+
+app.openapi(
+  createRoute({
+    method: 'get',
+    path: '/{id}',
+    summary: 'Get API Key',
+    description: 'Get a specific API key by ID (does not return the actual key)',
+    operationId: 'get-api-key-by-id',
+    tags: ['CRUD API Keys'],
+    request: {
+      params: TenantProjectParamsSchema.merge(IdParamsSchema),
+    },
+    responses: {
+      200: {
+        description: 'API key found',
+        content: {
+          'application/json': {
+            schema: SingleResponseSchema(ApiKeyApiSelectSchema),
+          },
+        },
+      },
+      ...commonGetErrorResponses,
+    },
+  }),
+  async (c) => {
+    const { tenantId, projectId, id } = c.req.valid('param');
+    const apiKey = await getApiKeyById(dbClient)({
+      scopes: { tenantId, projectId },
+      id,
+    });
+
+    if (!apiKey || apiKey === undefined) {
+      throw createApiError({
+        code: 'not_found',
+        message: 'API key not found',
+      });
+    }
+
+    // Remove sensitive fields from response
+    const { keyHash: _, tenantId: __, projectId: ___, ...sanitizedApiKey } = apiKey;
+
+    return c.json({
+      data: {
+        ...sanitizedApiKey,
+        lastUsedAt: sanitizedApiKey.lastUsedAt ?? null,
+        expiresAt: sanitizedApiKey.expiresAt ?? null,
+      },
+    });
+  }
+);
+
+app.openapi(
+  createRoute({
+    method: 'post',
+    path: '/',
+    summary: 'Create API Key',
+    description: 'Create a new API key for a graph. Returns the full key (shown only once).',
+    operationId: 'create-api-key',
+    tags: ['CRUD API Keys'],
+    request: {
+      params: TenantProjectParamsSchema,
+      body: {
+        content: {
+          'application/json': {
+            schema: ApiKeyApiInsertSchema,
+          },
+        },
+      },
+    },
+    responses: {
+      201: {
+        description: 'API key created successfully',
+        content: {
+          'application/json': {
+            schema: ApiKeyApiCreationResponseSchema,
+          },
+        },
+      },
+      ...commonGetErrorResponses,
+    },
+  }),
+  async (c) => {
+    const { tenantId, projectId } = c.req.valid('param');
+    const body = c.req.valid('json');
+    const keyData = await generateApiKey();
+
+    const { key, ...keyDataWithoutKey } = keyData;
+    const insertData = {
+      tenantId,
+      projectId,
+      graphId: body.graphId,
+      ...keyDataWithoutKey,
+      expiresAt: body.expiresAt || undefined,
+    };
+    const result = await createApiKey(dbClient)(insertData);
+    // Remove sensitive fields from the apiKey object (but keep the full key)
+    const { keyHash: _, tenantId: __, projectId: ___, ...sanitizedApiKey } = result;
+
+    return c.json(
+      {
+        data: {
+          apiKey: {
+            ...sanitizedApiKey,
+            lastUsedAt: sanitizedApiKey.lastUsedAt ?? null,
+            expiresAt: sanitizedApiKey.expiresAt ?? null,
+          },
+          key: key,
+        },
+      },
+      201
+    );
+  }
+);
+
+app.openapi(
+  createRoute({
+    method: 'put',
+    path: '/{id}',
+    summary: 'Update API Key',
+    description: 'Update an API key (currently only expiration date can be changed)',
+    operationId: 'update-api-key',
+    tags: ['CRUD API Keys'],
+    request: {
+      params: TenantProjectParamsSchema.merge(IdParamsSchema),
+      body: {
+        content: {
+          'application/json': {
+            schema: ApiKeyApiUpdateSchema,
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: 'API key updated successfully',
+        content: {
+          'application/json': {
+            schema: SingleResponseSchema(ApiKeyApiSelectSchema),
+          },
+        },
+      },
+      ...commonGetErrorResponses,
+    },
+  }),
+  async (c) => {
+    const { tenantId, projectId, id } = c.req.valid('param');
+    const body = c.req.valid('json');
+
+    const updatedApiKey = await updateApiKey(dbClient)({
+      scopes: { tenantId, projectId },
+      id,
+      data: {
+        expiresAt: body.expiresAt,
+      },
+    });
+
+    if (!updatedApiKey) {
+      throw createApiError({
+        code: 'not_found',
+        message: 'API key not found',
+      });
+    }
+
+    // Remove sensitive fields from response
+    const { keyHash: _, tenantId: __, projectId: ___, ...sanitizedApiKey } = updatedApiKey;
+
+    return c.json({
+      data: {
+        ...sanitizedApiKey,
+        lastUsedAt: sanitizedApiKey.lastUsedAt ?? null,
+        expiresAt: sanitizedApiKey.expiresAt ?? null,
+      },
+    });
+  }
+);
+
+app.openapi(
+  createRoute({
+    method: 'delete',
+    path: '/{id}',
+    summary: 'Delete API Key',
+    description: 'Delete an API key permanently',
+    operationId: 'delete-api-key',
+    tags: ['CRUD API Keys'],
+    request: {
+      params: TenantProjectParamsSchema.merge(IdParamsSchema),
+    },
+    responses: {
+      204: {
+        description: 'API key deleted successfully',
+      },
+      404: {
+        description: 'API key not found',
+        content: {
+          'application/json': {
+            schema: ErrorResponseSchema,
+          },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const { tenantId, projectId, id } = c.req.valid('param');
+
+    const deleted = await deleteApiKey(dbClient)({
+      scopes: { tenantId, projectId },
+      id,
+    });
+
+    if (!deleted) {
+      throw createApiError({
+        code: 'not_found',
+        message: 'API key not found',
+      });
+    }
+
+    return c.body(null, 204);
+  }
+);
+
+export default app;

@@ -1,0 +1,191 @@
+---
+title: Spans and Traces
+description: OpenTelemetry spans for distributed tracing and observability in the Inkeep Agent Framework
+---
+
+## Overview
+
+The Inkeep Agent Framework uses OpenTelemetry for distributed tracing and observability. Spans provide detailed visibility into the execution flow of agents, context resolution, tool execution, and other framework operations.
+
+## Getting Started with Spans
+
+### 1. Import Required Dependencies
+
+```typescript
+import { SpanStatusCode, type Span } from '@opentelemetry/api';
+import { getGlobalTracer, createSpanName } from '../tracer.js';
+```
+
+### 2. Get the Global Tracer
+
+```typescript
+// Use the centralized tracer utility
+const tracer = getGlobalTracer();
+```
+
+### 3. Create Span Names
+
+```typescript
+// Use the createSpanName utility for consistent naming to prefix all spans with service name
+const spanName = createSpanName('context.resolve');
+// Results in: "inkeep-chat.context.resolve"
+```
+
+## Creating and Using Spans
+
+```typescript
+return tracer.startActiveSpan(createSpanName('context.resolve'), {
+  attributes: {
+    'context.config_id': contextConfig.id,
+    'context.trigger_event': options.triggerEvent,
+  },
+}, async (span: Span) => {
+  try {
+    // Your operation logic here
+    return result;
+  } catch (error) {
+    // Error handling
+    span.recordException(error as Error);
+    span.setStatus({
+      code: SpanStatusCode.ERROR,
+      message: error.message,
+    });
+    throw error;
+  } 
+});
+```
+
+## Setting Span Attributes
+
+### Basic Attributes
+
+```typescript
+span.setAttributes({
+  'user.id': userId,
+  'request.method': 'POST',
+});
+```
+
+## Adding Events to Spans
+
+### Recording Important Milestones
+
+```typescript
+// Add events for significant operations
+span.addEvent('context.fetch_started', {
+  definitionId: definition.id,
+  url: definition.fetchConfig.url,
+});
+```
+
+### Error Events
+
+```typescript
+span.addEvent('error.validation_failed', {
+  definitionId: definition.id,
+  error_type: 'json_schema_validation',
+  error_details: errorMessage,
+});
+```
+
+## Error Handling and Status
+
+### Setting Error Status
+
+```typescript
+try {
+  // Your operation
+} catch (error) {
+  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+  
+  // Record the exception
+  span.recordException(error as Error);
+  
+  // Set error status
+  span.setStatus({
+    code: SpanStatusCode.ERROR,
+    message: errorMessage,
+  });
+  
+  throw error;
+}
+```
+
+## Best Practices
+
+### 1. Consistent Naming Convention
+
+The span naming convention follows a hierarchical structure that mirrors your code organization. 
+
+```typescript
+// Format: createSpanName('class.function')
+// Results in: "inkeep-chat.class.function"
+
+// Agent operations
+createSpanName('agent.generate')           // inkeep-chat.agent.generate
+createSpanName('agent.tool_execute')       // inkeep-chat.agent.tool_execute
+createSpanName('agent.transfer')            // inkeep-chat.agent.transfer
+
+// Context operations
+createSpanName('context.resolve')          // inkeep-chat.context.resolve
+createSpanName('context.fetch')            // inkeep-chat.context.fetch
+
+
+// Tool operations
+
+```
+
+#### Naming Rules
+
+1. **Class First**: Start with the class/module name (e.g., `agent`, `context`, `tool`)
+2. **Function Second**: Follow with the specific function/method (e.g., `generate`, `resolve`)
+3. **Use Underscores**: For multi-word functions, use underscores (e.g., `tool_execute`, `cache_lookup`)
+5. **Consistent Casing**: Use lowercase with underscores for consistency
+
+
+## Configuration and Setup
+
+### Environment Variables
+
+```bash
+# OpenTelemetry configuration
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+OTEL_SERVICE_NAME=inkeep-chat
+OTEL_SERVICE_VERSION=1.0.0
+```
+
+### Instrumentation Setup
+
+The framework automatically sets up OpenTelemetry instrumentation in `src/instrumentation.ts`:
+
+
+## Examples in the Codebase
+
+### Agent Operations
+See `src/agents/Agent.ts` for span usage in agent generation and tool execution.
+
+**Example from Agent.ts:**
+```typescript
+// Class: Agent
+// Function: generate
+return tracer.startActiveSpan(createSpanName('agent.generate'), {
+  attributes: {
+    'agent.id': this.id,
+    'agent.name': this.name,
+  },
+}, async (span: Span) => {
+  // ... implementation
+});
+```
+
+## Summary
+
+Spans provide powerful observability into your Inkeep Agent Framework operations. By following these patterns:
+
+1. **Use `getGlobalTracer()`** for consistent tracing
+2. **Use `createSpanName()`** for consistent naming
+3. **Set meaningful attributes** for searchability
+4. **Handle errors properly** with status and exceptions
+5. **Use `startActiveSpan`** for automatic lifecycle management
+
+This will give you comprehensive visibility into your agent operations, making debugging and performance optimization much easier.

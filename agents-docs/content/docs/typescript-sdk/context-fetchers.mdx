@@ -1,0 +1,197 @@
+---
+title: Context Fetchers
+description: Learn how to use context fetchers to fetch data from external sources and make it available to your agents
+---
+
+## Overview
+
+Context fetchers allow your agents to access real-time data from external sources like APIs, databases, and services. Instead of hardcoding information in your agent prompt, context fetchers dynamically retrieve fresh data for each conversation.
+
+## Key Features
+
+- **Dynamic data retrieval**: Fetch real-time data from APIs, databases, or other sources
+- **Request context integration**: Use request-specific parameters to customize data fetching
+- **Data transformation**: Transform API responses into the exact format your agent needs
+- **Template interpolation**: Use request context variables in URLs, headers, and request bodies
+- **Built-in Caching**: Automatic caching of fetched data based on trigger settings
+
+## How Context Fetchers Work
+
+- Request Arrives → HTTP request with body/headers/query/params
+- Validation → Validate against request context schema
+- Context Resolution → Resolve context variables using templates
+- Caching → Check cache, fetch if needed, store results
+- Agent Execution → Provide resolved context to agent prompt
+
+## Basic Usage
+
+Let's create a simple context fetcher that retrieves user information:
+
+```typescript
+import { z } from "zod";
+import {
+  agent,
+  agentGraph,
+  contextConfig,
+  fetchDefinition,
+} from "@inkeep/agents-manage-api/builders";
+
+// 1. Define request schema
+const requestSchema = z.object({
+  user_id: z.string(),
+  api_key: z.string(),
+});
+
+// 2. Create the fetcher
+const userFetcher = fetchDefinition({
+  id: "user-info",
+  name: "User Information",
+  trigger: "initialization", // Fetch when graph initializes. When set to "invocation", the fetch will be executed every time the graph is invoked.
+  fetchConfig: {
+    url: "https://api.example.com/users/{{requestContext.user_id}}",
+    method: "GET",
+    headers: {
+      Authorization: "Bearer {{requestContext.api_key}}",
+    },
+    transform: "name", // Extract user's name from response, for example if the response is { "name": "John Doe" }, the transform will return "John Doe"
+  },
+  responseSchema: z.string(),
+  defaultValue: "Unable to fetch user information",
+});
+
+// 3. Configure context
+const userContext = contextConfig({
+  tenantId: "your-tenant",
+  id: "user-context",
+  name: "User Context",
+  description: "Fetches user information for personalization",
+  requestContextSchema: requestSchema,
+  contextVariables: {
+    userName: userFetcher,
+  },
+});
+
+// 4. Create and use the agent
+const personalAgent = agent({
+  tenantId: "your-tenant",
+  id: "personal-agent",
+  name: "Personal Assistant",
+  description: "A personalized AI assistant",
+  prompt: `Hello {{userName}}! I'm your personal assistant.`,
+});
+```
+
+### Using the Context Fetcher
+
+```typescript
+// Initialize the graph
+const graph = agentGraph({
+  tenantId: "your-tenant",
+  id: "personal-graph",
+  name: "Personal Assistant Graph",
+  defaultAgent: personalAgent,
+  agents: () => [personalAgent],
+  contextConfig: userContext,
+});
+
+await graph.init();
+
+// Make a request with context
+const result = await graph.generate("What can you help me with?", {
+  requestContext: {
+    user_id: "123",
+    api_key: process.env.API_KEY,
+  },
+});
+```
+
+## Template interpolation
+
+Use double curly braces `{{}}` to reference request context variables in your fetcher configuration:
+
+```typescript
+const fetchDef = fetchDefinition({
+  // ... other properties
+  url: "https://api.example.com/users/{{requestContext.user_id}}",
+  headers: {
+    Authorization: "Bearer {{requestContext.auth_token}}",
+    "X-Org-Alias": "{{requestContext.org_alias}}",
+  },
+});
+```
+
+## Data transformation
+
+The `transform` property lets you extract exactly what you need from API responses using dot notation:
+
+```typescript
+// API returns: { "user": { "profile": { "displayName": "John Doe" } } }
+transform: "user.profile.displayName"; // Result: "John Doe"
+
+// API returns: { "items": [{ "name": "First Item" }, { "name": "Second Item" }] }
+transform: "items[0].name"; // Result: "First Item"
+```
+
+## GraphQL support
+
+GraphQL queries are fully supported through the `body` property. This allows you to make precise queries and leverage GraphQL's type safety and efficiency.
+
+### Basic GraphQL query
+
+```typescript
+const userFetcher = fetchDefinition({
+  id: "user-graphql",
+  name: "User GraphQL Fetcher",
+  trigger: "initialization",
+  url: "https://api.example.com/graphql",
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: "Bearer {{requestContext.auth_token}}",
+  },
+  body: {
+    query: `query($id: ID!) { 
+      user(id: $id) { 
+        name 
+        email 
+        profile {
+          displayName
+          department
+        }
+      } 
+    }`,
+    variables: {
+      id: "{{requestContext.user_id}}",
+    },
+  },
+  transform: "data.user", // Extract the user object from GraphQL response
+  responseSchema: z.object({
+    name: z.string(),
+    email: z.string(),
+    profile: z.object({
+      displayName: z.string(),
+      department: z.string(),
+    }),
+  }),
+});
+```
+
+## Best Practices
+
+1. **Use Appropriate Triggers**
+   - `initialization`: Use when data rarely changes
+   - `invocation`: Use for frequently changing data
+
+2. **Handle Errors Gracefully**
+   - Always provide a `defaultValue`
+   - Use appropriate response schemas
+
+3. **Optimize Performance**
+   - Keep transforms simple and specific
+   - Use GraphQL to minimize data transfer
+   - Leverage caching when possible
+
+4. **Security Considerations**
+   - Never expose sensitive credentials in templates
+   - Validate and sanitize all input data
+   - Use appropriate authentication headers

@@ -1,0 +1,337 @@
+import { getLogger } from '../logger.js';
+import { ArtifactParser, type StreamPart } from './artifact-parser.js';
+import type { StreamHelper } from './stream-helpers.js';
+
+const logger = getLogger('IncrementalStreamParser');
+
+interface ParseResult {
+  completeParts: StreamPart[];
+  remainingBuffer: string;
+}
+
+/**
+ * Incremental parser that processes streaming text and formats artifacts/objects as they become complete
+ * Uses the unified ArtifactParser to eliminate redundancy
+ */
+export class IncrementalStreamParser {
+  private buffer = '';
+  private pendingTextBuffer = '';
+  private streamHelper: StreamHelper;
+  private artifactParser: ArtifactParser;
+  private contextId: string;
+  private hasStartedRole = false;
+  private collectedParts: StreamPart[] = [];
+
+  constructor(streamHelper: StreamHelper, tenantId: string, contextId: string) {
+    this.streamHelper = streamHelper;
+    this.contextId = contextId;
+    this.artifactParser = new ArtifactParser(tenantId);
+  }
+
+  /**
+   * Process a new text chunk for text streaming (handles artifact markers)
+   */
+  async processTextChunk(chunk: string): Promise<void> {
+    this.buffer += chunk;
+
+    const parseResult = await this.parseTextBuffer();
+
+    // Stream complete parts
+    for (const part of parseResult.completeParts) {
+      await this.streamPart(part);
+    }
+
+    // Update buffer with remaining content
+    this.buffer = parseResult.remainingBuffer;
+  }
+
+  /**
+   * Process a new object chunk for object streaming (handles JSON objects with artifact references)
+   */
+  async processObjectChunk(chunk: string): Promise<void> {
+    this.buffer += chunk;
+
+    const parseResult = await this.parseObjectBuffer();
+
+    // Stream complete parts
+    for (const part of parseResult.completeParts) {
+      await this.streamPart(part);
+    }
+
+    // Update buffer with remaining content
+    this.buffer = parseResult.remainingBuffer;
+  }
+
+  /**
+   * Process tool call stream for structured output, streaming components as they complete
+   */
+  async processToolCallStream(stream: AsyncIterable<any>, targetToolName: string): Promise<void> {
+    let jsonBuffer = '';
+    let componentBuffer = '';
+    let depth = 0;
+    let inDataComponents = false;
+    let componentsStreamed = 0;
+    
+    for await (const part of stream) {
+      // Look for tool call deltas with incremental JSON
+      if (part.type === 'tool-call-delta' && part.toolName === targetToolName) {
+        const delta = part.argsTextDelta || '';
+        jsonBuffer += delta;
+        
+        // Parse character by character to detect complete components
+        for (const char of delta) {
+          componentBuffer += char;
+          
+          // Track JSON depth
+          if (char === '{') {
+            depth++;
+          } else if (char === '}') {
+            depth--;
+            
+            // At depth 2, we're inside the dataComponents array
+            // When we return to depth 2, we have a complete component
+            if (depth === 2 && componentBuffer.includes('"id"')) {
+              // Extract just the component object
+              const componentMatch = componentBuffer.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
+              if (componentMatch) {
+                try {
+                  const component = JSON.parse(componentMatch[0]);
+                  
+                  // Stream this individual component
+                  const parts = await this.artifactParser.parseObject({ dataComponents: [component] });
+                  for (const part of parts) {
+                    await this.streamPart(part);
+                  }
+                  
+                  componentsStreamed++;
+                  componentBuffer = ''; // Reset for next component
+                } catch (e) {
+                  // Not valid JSON yet, keep accumulating
+                  logger.debug({ error: e }, 'Failed to parse component, continuing to accumulate');
+                }
+              }
+            }
+          }
+          
+          // Detect when we enter dataComponents array
+          if (componentBuffer.includes('"dataComponents"') && componentBuffer.includes('[')) {
+            inDataComponents = true;
+          }
+        }
+      }
+      // Alternative: if the SDK provides complete tool calls (not deltas)
+      else if (part.type === 'tool-call' && part.toolName === targetToolName) {
+        // Process the complete args at once
+        if (part.args?.dataComponents) {
+          const parts = await this.artifactParser.parseObject(part.args);
+          for (const part of parts) {
+            await this.streamPart(part);
+          }
+        }
+        break; // Tool call complete
+      }
+    }
+    
+    logger.debug({ componentsStreamed }, 'Finished streaming components');
+  }
+
+  /**
+   * Legacy method for backward compatibility - defaults to text processing
+   */
+  async processChunk(chunk: string): Promise<void> {
+    await this.processTextChunk(chunk);
+  }
+
+  /**
+   * Process any remaining buffer content at the end of stream
+   */
+  async finalize(): Promise<void> {
+    if (this.buffer.trim()) {
+      // Process remaining buffer as final text
+      const part: StreamPart = {
+        kind: 'text',
+        text: this.buffer.trim(),
+      };
+      await this.streamPart(part);
+    }
+
+    // Flush any remaining buffered text
+    if (this.pendingTextBuffer.trim()) {
+      // Clean up any artifact-related tags or remnants before final flush
+      const cleanedText = this.pendingTextBuffer
+        .replace(/<\/?artifact:ref[^>]*>/g, '') // Remove all artifact:ref tags (opening and closing)
+        .replace(/<\/?artifact[^>]*>/g, '') // Remove all artifact tags
+        .replace(/<\/[^>]*artifact[^>]*>/g, '') // Remove closing tags with artifact in the name
+        .replace(/<[^>]*artifact[^>]*\/?>/g, '') // Remove any remaining artifact-related tags
+        .trim();
+      
+      if (cleanedText) {
+        this.collectedParts.push({
+          kind: 'text',
+          text: cleanedText,
+        });
+
+        await this.streamHelper.streamText(cleanedText, 50);
+      }
+      this.pendingTextBuffer = '';
+    }
+  }
+
+  /**
+   * Get all collected parts for building the final response
+   */
+  getCollectedParts(): StreamPart[] {
+    return [...this.collectedParts];
+  }
+
+  /**
+   * Parse buffer for complete artifacts and text parts (for text streaming)
+   */
+  private async parseTextBuffer(): Promise<ParseResult> {
+    const completeParts: StreamPart[] = [];
+    const workingBuffer = this.buffer;
+
+    // Check if we have incomplete artifact markers
+    if (this.artifactParser.hasIncompleteArtifact(workingBuffer)) {
+      // Find safe boundary to stream text before incomplete artifact
+      const safeEnd = this.artifactParser.findSafeTextBoundary(workingBuffer);
+
+      if (safeEnd > 0) {
+        const safeText = workingBuffer.slice(0, safeEnd);
+        // Parse the safe portion for complete artifacts
+        const parts = await this.artifactParser.parseText(safeText);
+        completeParts.push(...parts);
+
+        return {
+          completeParts,
+          remainingBuffer: workingBuffer.slice(safeEnd),
+        };
+      }
+
+      // Buffer contains only incomplete artifact
+      return {
+        completeParts: [],
+        remainingBuffer: workingBuffer,
+      };
+    }
+
+    // No incomplete artifacts, parse the entire buffer
+    const parts = await this.artifactParser.parseText(workingBuffer);
+
+    // Check last part - if it's text, it might be incomplete
+    if (parts.length > 0 && parts[parts.length - 1].kind === 'text') {
+      const lastPart = parts[parts.length - 1];
+      const lastText = lastPart.text || '';
+
+      // Keep some text in buffer if it might be start of artifact
+      if (this.mightBeArtifactStart(lastText)) {
+        parts.pop(); // Remove last text part
+        return {
+          completeParts: parts,
+          remainingBuffer: lastText,
+        };
+      }
+    }
+
+    return {
+      completeParts: parts,
+      remainingBuffer: '',
+    };
+  }
+
+  /**
+   * Parse buffer for complete JSON objects with artifact references (for object streaming)
+   */
+  private async parseObjectBuffer(): Promise<ParseResult> {
+    const completeParts: StreamPart[] = [];
+
+    try {
+      // Try to parse as complete JSON
+      const parsed = JSON.parse(this.buffer);
+      const parts = await this.artifactParser.parseObject(parsed);
+
+      return {
+        completeParts: parts,
+        remainingBuffer: '',
+      };
+    } catch {
+      // JSON is incomplete, try partial parsing
+      const { complete, remaining } = this.artifactParser.parsePartialJSON(this.buffer);
+
+      for (const obj of complete) {
+        const parts = await this.artifactParser.parseObject(obj);
+        completeParts.push(...parts);
+      }
+
+      return {
+        completeParts,
+        remainingBuffer: remaining,
+      };
+    }
+  }
+
+  /**
+   * Check if text might be the start of an artifact marker
+   */
+  private mightBeArtifactStart(text: string): boolean {
+    const lastChars = text.slice(-20); // Check last 20 chars
+    return lastChars.includes('<') && !lastChars.includes('/>');
+  }
+
+  /**
+   * Stream a formatted part (text or data) with smart buffering
+   */
+  private async streamPart(part: StreamPart): Promise<void> {
+    // Collect for final response
+    this.collectedParts.push({ ...part });
+
+    if (!this.hasStartedRole) {
+      await this.streamHelper.writeRole('assistant');
+      this.hasStartedRole = true;
+    }
+
+    if (part.kind === 'text' && part.text) {
+      // Add to pending buffer
+      this.pendingTextBuffer += part.text;
+
+      // Flush if safe to do so
+      if (!this.artifactParser.hasIncompleteArtifact(this.pendingTextBuffer)) {
+        // Clean up any artifact-related tags or remnants before flushing
+        const cleanedText = this.pendingTextBuffer
+          .replace(/<\/?artifact:ref[^>]*>/g, '') // Remove all artifact:ref tags (opening and closing)
+          .replace(/<\/?artifact[^>]*>/g, '') // Remove all artifact tags
+          .replace(/<\/[^>]*artifact[^>]*>/g, '') // Remove closing tags with artifact in the name
+          .replace(/<[^>]*artifact[^>]*\/?>/g, ''); // Remove any remaining artifact-related tags
+        
+        if (cleanedText.trim()) {
+          await this.streamHelper.streamText(cleanedText, 50);
+        }
+        this.pendingTextBuffer = '';
+      }
+    } else if (part.kind === 'data' && part.data) {
+      // Flush any pending text before streaming data
+      if (this.pendingTextBuffer) {
+        // Clean up any artifact-related tags or remnants before flushing
+        const cleanedText = this.pendingTextBuffer
+          .replace(/<\/?artifact:ref[^>]*>/g, '') // Remove all artifact:ref tags (opening and closing)
+          .replace(/<\/?artifact[^>]*>/g, '') // Remove all artifact tags
+          .replace(/<\/[^>]*artifact[^>]*>/g, '') // Remove closing tags with artifact in the name
+          .replace(/<[^>]*artifact[^>]*\/?>/g, ''); // Remove any remaining artifact-related tags
+        
+        if (cleanedText.trim()) {
+          await this.streamHelper.streamText(cleanedText, 50);
+        }
+        this.pendingTextBuffer = '';
+      }
+
+      // Determine if this is an artifact or regular data component
+      const isArtifact = part.data.artifactId && part.data.taskId;
+
+      if (isArtifact) {
+        await this.streamHelper.writeData('data-artifact', part.data);
+      } else {
+        await this.streamHelper.writeData('data-component', part.data);
+      }
+    }
+  }
+}

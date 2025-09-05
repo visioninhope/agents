@@ -1,0 +1,90 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "tui",
+  "globalDependencies": ["**/.env", "**/.env.local", "**/.env.*"],
+  "globalEnv": [
+    "NODE_ENV",
+    "CI",
+    "TURBO_TOKEN",
+    "TURBO_TEAM",
+    "TURBO_TELEMETRY_DISABLED",
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "ENVIRONMENT",
+    "DB_FILE_NAME",
+    "PORT",
+    "LOG_LEVEL"
+  ],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": ["dist/**", "build/**", ".next/**", "!.next/cache/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "start": {
+      "dependsOn": ["build"],
+      "cache": false
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "inputs": ["$TURBO_DEFAULT$", "**/*.{test,spec}.{js,jsx,ts,tsx}"],
+      "outputs": ["coverage/**"]
+    },
+    "@inkeep/agents-cli#test": {
+      "dependsOn": ["build"],
+      "inputs": ["$TURBO_DEFAULT$", "**/*.{test,spec}.{js,jsx,ts,tsx}"],
+      "outputs": ["coverage/**"],
+      "env": ["CI"]
+    },
+    "chat-widget#test": {
+      "dependsOn": ["build"],
+      "outputs": []
+    },
+    "@inkeep/examples#test": {
+      "dependsOn": ["build"],
+      "outputs": []
+    },
+    "test:watch": {
+      "cache": false,
+      "persistent": true
+    },
+    "test:coverage": {
+      "dependsOn": ["build"],
+      "inputs": ["$TURBO_DEFAULT$", "**/*.{test,spec}.{js,jsx,ts,tsx}"],
+      "outputs": ["coverage/**"]
+    },
+    "lint": {
+      "inputs": ["$TURBO_DEFAULT$"],
+      "outputs": []
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$"],
+      "outputs": []
+    },
+    "db:push": {
+      "cache": false,
+      "inputs": ["drizzle.config.ts", "src/data/db/schema.ts"]
+    },
+    "db:clean": {
+      "cache": false
+    },
+    "db:reset-schema": {
+      "cache": false,
+      "outputs": ["drizzle/**"]
+    },
+    "docs#dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "dev:apis": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": ["@inkeep/agents-core#build"]
+    }
+  }
+}

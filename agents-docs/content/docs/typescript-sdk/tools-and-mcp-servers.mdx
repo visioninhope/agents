@@ -1,0 +1,83 @@
+---
+title: MCP Servers
+description: Learn how to add and configure MCP servers for your agents
+---
+
+MCP tools connect to external servers that implement the MCP standard. This allows you to integrate with a wide ecosystem of existing tools and services.
+
+### Basic MCP Tool
+
+```typescript
+import { mcpTool } from "@inkeep/agents-manage-api/builders";
+
+const knowledgeBaseTool = mcpTool({
+  id: "knowledge-base-tool",
+  tenantId: "your-tenant",
+  name: "knowledge_base",
+  description: "Search the company knowledge base for information",
+  serverUrl: "https://kb.yourcompany.com/mcp",
+});
+
+const qaAgent = agent({
+  id: "qa-agent",
+  tenantId: "your-tenant",
+  name: "QA Agent",
+  tools: {
+    knowledge_base: knowledgeBaseTool,
+  },
+});
+```
+
+### MCP Tool with Credentials
+
+MCP tools can be configured with credentials to access external services. See [Credentials](/typescript-sdk/credential-store) for how to store and retrieve credentials.
+
+```typescript
+const inkeepAnalyticsTool = mcpTool({
+  id: "inkeep-analytics",
+  tenantId: "your-tenant",
+  name: "inkeep_analytics",
+  description: "Get the latest stats from the Inkeep Analytics dashboard",
+  serverUrl: "https://analytics.inkeep.com/mcp",
+  credentialReferenceId: "3r24d939kd939kd", // Reference to stored credentials
+  mcpType: "generic", // Automatically handles auth headers
+  transport: {
+    type: "streamable_http",
+  },
+});
+```
+
+### Best Practices
+
+To ensure agents properly utilize their tools, follow these best practices:
+
+1. **Give tools clear, descriptive names and descriptions** - Explain what the tool does and when it should be used
+2. **Reference the tool in the agent's prompt** - Explicitly mention that the agent has access to specific tools and describe scenarios where they should be used
+
+This helps the agent understand both what tools are available and when to use them. For example:
+
+```typescript
+const productTool = mcpTool({
+    id: 'product-tool',
+    name: 'product',
+    description: 'A basic product tool used to answer questions about the Inkeep product',
+    serverUrl: 'https://mcp.inkeep.com/inkeep/mcp',
+});
+
+const productAgent = agent({
+    id: 'product-agent',
+    name: 'Product Agent',
+    description: 'A basic product agent that can answer questions about the Inkeep product and hand off to the router agent if needed',
+    prompt:
+      `You are a basic product agent. You are given questions about products and you need to answer them. 
+      
+      If you need to answer a question that is not about the Inkeep product, you should hand off to the router agent.
+      
+      The product tool is a tool that can be used to answer questions about the Inkeep product.
+      `,
+    tools: {
+        product: productTool,
+    },
+    canTransferTo: () => [routerAgent],
+  });
+```

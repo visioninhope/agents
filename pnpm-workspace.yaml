@@ -1,0 +1,12 @@
+packages:
+  - agents-manage-api
+  - agents-run-api
+  - agents-manage-ui
+  - agents-cli
+  - agents-ui
+  - examples
+  - agents-docs
+  - packages/agents-core
+  - packages/agents-sdk
+onlyBuiltDependencies:
+  - keytar

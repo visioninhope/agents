@@ -1,0 +1,132 @@
+---
+title: Overview of the Inkeep Agent Platform
+sidebarTitle: Overview
+---
+
+
+With Inkeep, you can create and manage agents with the **No-Code Visual Builder** or **TypeScript Agents SDK**. 
+
+Inkeep Agents are often used as:
+- An **Internal Agent** accessible from ChatGPT, Claude, Cursor, Zendesk, and other apps your team uses
+- A **Customer-facing Agent** that you embed as a support assistant, in-app copilot, or custom chatbot on your site.
+- A **Workflow Agent** used to automate repetitive tasks at scale, like updating docs, creating blog posts, summarizing sales calls, and more.
+
+Agents are flexible and customizable - they can take on the role you need them to.
+
+To get started, follow this guide to try the **open-source version** or learn about Inkeep Enterprise Cloud [here](/oss-enterprise-comparison).
+
+## Two ways to build your agents
+
+1. **Agent Visual Builder**: A no-code interface designed to let both technical and non-technical teams create and manage agents.
+
+<img
+  src="/gifs/visual-builder.gif"
+  alt="Visual Builder Demo"
+  width="100%"
+  style={{ borderRadius: "10px" }}
+/>
+
+2. **TypeScript Agents SDK**: A code-first approach for building and managing agents and multi-agent systems, allowing you to build complex agent systems with the tools your engineering team expects.
+
+   ```typescript
+    import { agent, agentGraph } from '@inkeep/agents-sdk';
+
+    const helloAgent = agent({
+      id: 'hello-agent',
+      name: 'Hello Agent',
+      description: 'A basic agent',
+      prompt:
+        'You are a basic agent that just says hello. You only reply with the word "hello", but you may do it in different variations like h3110, h3110w0rld, h3110w0rld! etc...',
+    });
+
+    export const graph = agentGraph({
+      id: 'basic-graph',
+      name: 'Basic Graph Example',
+      description: 'A basic graph',
+      defaultAgent: helloAgent,
+      agents: () => [helloAgent],
+    });
+   ```
+
+The **Visual Builder and Agents SDK are fully interoperable**: your technical and non-technical teams can edit and manage agents in either format and switch or collaborate with others at any time.
+
+## Key Concepts
+- **Agents**: LLM and AI driven decision-making units defined by instructions ('prompts') that can take actions, answer questions, and coordinate with other agents as needed.
+- **Graphs**: A team of agents that work together to perform complex tasks across your apps and APIs.
+- **Tools**: The capabilities that agents can invoke. Tools can be your own custom functions or you can leverage our pre-built MCP tools for common integrations.
+- **Transfers and Delegations**: Relationships between agents. Transfers involve a transfer of control of the chat from one agent to another, and delegation allows an agent to create a sub-task for a different agent.
+- **Traces**: A log that gives you full visibility into every step of how an agent graph ran. Accessible via UI or OpenTelemetry.
+
+## Advanced Features
+
+- **Data Components**: Define what agents can output in their messages so they can render rich, interactive UIs (lists, buttons, forms, etc.).
+- **Context Fetchers**: A way to retrieve and cache data about your user or apps so that an agent has it immediately available in it's prompt.
+- **Artifacts**: A piece of data that can be saved by an agent so it is accessible to other agents or users.
+
+<Tabs>
+  <Tab title="Agents SDK">
+    Using the `@inkeep/agents-sdk` library.
+    <Cards>
+      <Card title="Agent Configuration" icon="LuUser" href="/docs/typescript-sdk/agent-configuration">
+        Configure an agent with prompt, tools, and data components.
+      </Card>
+      <Card title="Agent Relationships" icon="LuUsers" href="/docs/typescript-sdk/agent-relationships">
+        Define relationships between agents.
+      </Card>
+      <Card title="Remote Agents" icon="LuGlobe" href="/docs/typescript-sdk/external-agent-configuration">
+        Define remote agents that can be used in your graph.
+      </Card>
+      <Card title="MCPs" icon="LuHammer" href="/docs/typescript-sdk/mcp-servers">
+        Use pre-built MCP servers.
+      </Card>
+      <Card title="Credentials" icon="LuKey" href="/docs/typescript-sdk/credentials">
+        Store and retrieve credentials for MCP tools.
+      </Card>
+      <Card title="Data Components" icon="LuLayoutTemplate" href="/docs/typescript-sdk/data-components">
+        Create UI elements for agents to render in conversations.
+      </Card>
+      <Card title="Context Fetchers" icon="LuCirclePlus" href="/docs/typescript-sdk/context-fetchers">
+        Dynamically retrieve and cache external data when agents need it.
+      </Card>
+      <Card title="Artifact Components" icon="TbInputSpark" href="/docs/typescript-sdk/artifacts">
+        Create structured outputs from tools or agents.
+      </Card>
+      <Card title="Status Updates" icon="LuClock" href="/docs/typescript-sdk/status-updates">
+        Real-time progress updates powered by AI that keep users informed during agent operations.
+      </Card>
+      <Card title="CLI reference" icon="LuTerminal" href="/docs/typescript-sdk/cli-reference">
+        Reference the CLI commands for building and managing your agents.
+      </Card>
+      <Card title="Spans and tracing" icon="LuBug" href="/docs/typescript-sdk/spans">
+        Spans and tracing for your agents.
+      </Card>
+    </Cards>
+
+  </Tab>
+
+  <Tab title="Visual Builder">
+    <Cards>
+      <Card title="Graphs" icon="LuSpline" href="/docs/visual-builder/graphs">
+        Create and manage agent graphs.
+      </Card>
+      <Card title="MCP Servers" icon="LuServer" href="/docs/visual-builder/mcp-servers">
+        Create and manage MCP servers.
+      </Card>
+      <Card title="Credentials" icon="LuKey" href="/docs/visual-builder/credentials">
+        Create and manage credentials for MCP servers.
+      </Card>
+      <Card title="Data Components" icon="LuLayoutTemplate" href="/docs/visual-builder/data-components">
+        Create UI elements for agents to render in conversations.
+      </Card>
+      <Card title="Artifact Components" icon="TbInputSpark" href="/docs/visual-builder/artifact-components">
+        Create structured outputs from tools or agents.
+      </Card>
+      <Card title="Status Components" icon="LuClock" href="/docs/visual-builder/status-components">
+        Create status components for agents to render in conversations.
+      </Card>
+      <Card title="Project Management" icon="LuFolder" href="/docs/visual-builder/project-management">
+        Manage your projects and agents.
+      </Card>
+    </Cards>
+  </Tab>
+</Tabs>

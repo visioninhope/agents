@@ -1,0 +1,113 @@
+---
+title: Quick Start
+description: Get started with Inkeep's multi-agent framework
+---
+
+## Step 1: Installation
+
+You can create a new project by cloning the quick start template:
+
+```bash
+git clone https://github.com/inkeep/agent-quick-start-template
+```
+
+Once the template has been installed, navigate to the project directory and install the dependencies:
+
+```bash
+cd my-inkeepagent-app
+npm install
+```
+
+## Step 2: Add Your API Keys
+
+Edit the `.env` file in your project root and add your API key:
+
+```bash
+ENVIRONMENT=development
+DB_FILE_NAME=file:local.db
+
+# For OpenAI (required for default structured output and summarizer models)
+OPENAI_API_KEY=your-api-key-here
+
+# For Anthropic (required for default base model)
+ANTHROPIC_API_KEY=your-api-key-here
+```
+
+**Why both keys?** The system uses different default models:
+- **Base model**: `anthropic/claude-4-sonnet-20250514` (requires Anthropic key)
+- **Structured output model**: `openai/gpt-4.1-mini-2025-04-14` (requires OpenAI key)
+- **Summarizer model**: `openai/gpt-4.1-nano-2025-04-14` (requires OpenAI key)
+
+## Step 3: Database Setup
+
+The quick start template uses a SQLite database to store agent data.
+
+```bash
+pnpm db:push
+```
+
+## Step 4: Start Your Agent Server
+
+```bash
+pnpm dev
+```
+
+## Step 5: Push Your Agent Configuration with the CLI
+
+The Inkeep CLI is the primary tool for deploying agent configurations to your server. Use it to push TypeScript files that define your agents and their relationships:
+
+```bash
+# Install the Inkeep CLI globally (one-time setup)
+npm install -g @inkeep/agents-cli
+
+# Push your agent configuration TypeScript file
+inkeep push path/to/your/agent-config.ts
+```
+
+The CLI will:
+- Parse your TypeScript file containing agent definitions
+- Validate the configuration
+- Deploy the agents to your running server
+- Make them available for interaction
+
+For example, to push the sample graph configuration:
+
+```bash
+inkeep push src/examples/sample-graph.ts
+```
+
+This is the standard workflow for deploying agents - define them in TypeScript, then use the CLI to push them to your server.
+
+## Step 6: Testing with Sample Graph
+
+You can also execute the sample graph directly for testing. Observe the output:
+
+```bash
+npm exec tsx src/examples/sample-graph.ts
+```
+
+## Step 7: Visualize the Graph
+
+1. Run the following command to start the visual builder:
+
+```bash
+pnpm dev:visual-builder
+```
+
+2. **Open the Agent Builder Platform:** Go to http://localhost:3000/ in your browser.
+
+3. **Locate Your Graph:** On the Graphs page, you should see the sample graph listed (e.g., "Sample Graph").
+4. **Open Agent Details:** Click on the agent node and view details such as its id, name, description, and prompt.
+5. **Start Chatting:** Click the Try it button in the top right corner to open the chat window.
+6. **Send a Message:** Ask a question like "Why is the sky blue?" and press Enter. You should receive a response from your AI agent in the chat window.
+
+<img src="/gifs/visual-builder.gif" alt="Visual Builder Demo" width="100%" style={{ borderRadius: "10px" }} />
+
+## Next Steps
+
+Ready to create intelligent AI agents? Our comprehensive tutorial guides you through the process:
+- [Starter Tutorial](../typescript-sdk/starter-tutorial)
+
+Or dive deeper into specific topics:
+- Check out [agent configuration](../typescript-sdk/agent-configuration)
+- Learn about [tool creation](../typescript-sdk/tool-creation)

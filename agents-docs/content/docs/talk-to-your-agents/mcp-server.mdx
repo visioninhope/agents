@@ -1,0 +1,78 @@
+---
+title: MCP Server
+description: Learn how to use the MCP server to talk to your agents
+---
+
+The MCP server allows you to talk to your agents through the Model Context Protocol.
+
+## MCP Server Implementation
+
+The MCP server is implemented in the `@inkeep/agents-run-api` library and provides a standard interface for agent communication.
+
+## Available Tools
+
+The MCP server exposes one core tool:
+
+### send-query-to-agent
+
+Sends a query to your agent graph's default agent. This tool:
+
+- **Name**: `send-query-to-agent`  
+- **Description**: Dynamically generated based on your agent graph's name and description
+- **Parameters**: 
+  - `query` (string): The query to send to the agent
+- **Returns**: The agent's response as text content
+
+**Example usage in Cursor:**
+When the MCP server is configured, Cursor will automatically discover this tool and you can use it by asking questions. The tool will route your query to the appropriate agent in your graph and return the response.
+
+The tool handles:
+- Message creation and conversation management
+- Agent execution with your configured tools and capabilities  
+- Context resolution if your graph has context configuration
+- Error handling and response formatting
+
+## Using with Cursor
+
+Add the following configuration to your Cursor MCP settings:
+
+### Production Mode (with API Key)
+
+```json
+{
+  "AgentName": {
+    "type": "mcp",
+    "url": "http://<your-run-api-url>/v1/mcp",
+    "headers": {
+      "Authorization": "Bearer <api-key>",
+      "x-inkeep-tenant-id": "your-tenant-id",
+      "x-inkeep-project-id": "your-project-id",
+      "x-inkeep-graph-id": "your-graph-id"
+    }
+  }
+}
+```
+
+### Development Mode (No API Key)
+
+When `agents-run-api` is running with `ENVIRONMENT=development`, authentication is not required:
+
+```json
+{
+  "BasicFactAgent": {
+    "type": "mcp",
+    "url": "http://<your-run-api-url>/v1/mcp",
+    "headers": {
+      "x-inkeep-tenant-id": "inkeep",
+      "x-inkeep-project-id": "default",
+      "x-inkeep-graph-id": "inkeep-qa-graph"
+    }
+  }
+}
+```
+
+## Configuration Notes
+
+- **URL**: Point to your `agents-run-api` instance (default: `http://localhost:3003`)
+- **Headers**: Required scope headers for identifying the tenant, project, and graph
+- **Authorization**: Only required when not in development mode

@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "lib": ["ES2022"],
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@inkeep/agent-framework": ["../configuration/dist/index.js"],
+      "@inkeep/agent-framework/*": ["../configuration/dist/*"],
+      "@inkeep/agents-cli": ["../cli/dist/exports.js"],
+      "@inkeep/agents-cli/*": ["../cli/dist/*"]
+    }
+  },
+  "exclude": ["node_modules", "dist"]
+}

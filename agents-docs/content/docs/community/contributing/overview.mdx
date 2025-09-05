@@ -1,0 +1,170 @@
+---
+title: Overview
+description: How to contribute to the Inkeep Agent Framework
+---
+
+# Contributing to the Inkeep Agent Framework
+
+Thank you for your interest in contributing to the Agent Framework! This document provides guidelines and information for contributors.
+
+## Development Setup
+
+### Prerequisites
+
+- Node.js 22+ (see `.nvmrc`)
+- pnpm package manager
+- Docker Desktop (for certain features)
+
+### Installation
+
+```bash
+# Install dependencies
+pnpm install
+
+# Set up the database
+cd inkeep-chat
+pnpm db:push
+```
+
+## Development Workflow
+
+### Git Hooks
+
+This project uses Husky for Git hooks to maintain code quality. The hooks are automatically installed when you run `pnpm install`.
+
+#### Pre-commit Hook
+
+The pre-commit hook runs the following checks before allowing a commit:
+
+1. **Type checking** - Ensures type safety across all packages
+2. **Tests** - Runs the test suite
+
+##### Bypassing Checks
+
+While we recommend running all checks, there are legitimate cases where you might need to bypass them:
+
+**Skip typecheck only (tests still run):**
+```bash
+SKIP_TYPECHECK=1 git commit -m "WIP: debugging issue"
+```
+
+**Skip all hooks (use sparingly):**
+```bash
+git commit --no-verify -m "emergency: hotfix for production"
+```
+
+> **Note:** Use these bypass mechanisms sparingly. They're intended for:
+> - Work-in-progress commits that you'll fix before pushing
+> - Emergency fixes where speed is critical
+> - Commits that only touch non-code files (though hooks are smart enough to handle this)
+
+### Code Quality
+
+#### Type Checking
+
+Run type checking across all packages:
+```bash
+pnpm typecheck
+```
+
+#### Linting
+
+Run the linter:
+```bash
+pnpm lint
+```
+
+Format code automatically:
+```bash
+pnpm format
+```
+
+#### Testing
+
+Run tests:
+```bash
+pnpm test              # Run all tests
+pnpm test:watch        # Run tests in watch mode
+pnpm test:coverage     # Run tests with coverage report
+```
+
+### Building
+
+Build all packages:
+```bash
+pnpm build
+```
+
+### Development Server
+
+Start the development server:
+```bash
+cd inkeep-chat
+pnpm dev
+```
+
+## Project Structure
+
+This is a monorepo managed with Turborepo. Key packages include:
+
+- `inkeep-chat/` - Main Agent Framework server
+- `agent-builder/` - Builder SDK for declarative agent definitions
+- `cli/` - Command-line interface
+- `chat-widget/` - Web chat widget
+
+## Commit Messages
+
+We follow conventional commit format:
+
+```
+type(scope): description
+
+[optional body]
+
+[optional footer]
+```
+
+Types:
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation changes
+- `style`: Code style changes (formatting, etc.)
+- `refactor`: Code refactoring
+- `test`: Test changes
+- `chore`: Build process or auxiliary tool changes
+
+## Pull Requests
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feat/amazing-feature`)
+3. Make your changes
+4. Ensure all checks pass (`pnpm typecheck && pnpm test`)
+5. Commit your changes (following commit message guidelines)
+6. Push to your fork
+7. Open a pull request
+
+### PR Guidelines
+
+- Keep PRs focused on a single feature or fix
+- Update tests for any behavior changes
+- Update documentation as needed
+- Ensure CI passes before requesting review
+
+## Continuous Integration
+
+Our CI pipeline runs on all pull requests and includes:
+
+- Type checking (`pnpm typecheck`)
+- Tests (`pnpm test`)
+- Build verification (`pnpm build`)
+
+These checks must pass before a PR can be merged. The same checks run in pre-commit hooks to catch issues early.
+
+## Questions?
+
+If you have questions about contributing, please:
+1. Check existing issues and discussions
+2. Open a new issue if your question isn't addressed
+3. Reach out to the maintainers
+
+Thank you for contributing!

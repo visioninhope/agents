@@ -1,0 +1,331 @@
+---
+title: Project Management
+description: Learn how to create and manage projects in the Inkeep Agent Framework
+---
+
+## Overview
+
+Projects are the top-level organizational unit in the Inkeep Agent Framework. Each project contains its own agents, graphs, tools, and resources. This allows you to separate different applications or environments within a single tenant.
+
+## Creating a Project
+
+There are two ways to create a new project:
+
+### Using the Project Dialog
+
+When you have existing projects, you can create a new one using the "Create Project" button in the project switcher at the bottom of the sidebar.
+
+### First Project Creation
+
+If you don't have any projects yet, you'll be automatically redirected to the project creation page when you log in. You can also access it directly at `/{tenantId}/projects/new`.
+
+## Project Fields
+
+When creating a project, you'll need to provide:
+
+- **Project ID**: A unique identifier for your project. This must:
+  - Start and end with lowercase alphanumeric characters
+  - May contain hyphens in the middle
+  - Cannot be changed after creation
+  - Examples: `my-project`, `production-v2`, `test-env1`
+
+- **Project Name**: A friendly display name for your project (up to 100 characters)
+
+- **Description**: A brief description of what the project is for (up to 500 characters)
+
+## Project Structure
+
+Each project can contain:
+
+- **Agent Graphs**: Collections of AI agents that work together
+- **API Keys**: Authentication keys for accessing your agents via API
+- **MCP Servers**: Model Context Protocol servers for external tools
+- **Data Components**: Reusable data structures for your agents
+- **Artifact Components**: Reusable UI components for agent outputs
+- **Credentials**: Secure storage for API keys and authentication tokens
+
+## Project-Level Configuration
+
+Projects can define default configurations that cascade down to all graphs and agents within the project. This provides a consistent baseline while allowing specific overrides where needed.
+
+### Model Settings
+
+Define default models at the project level that all graphs and agents will inherit:
+
+```typescript
+// Project configuration
+{
+  id: "my-project",
+  name: "My AI Project",
+  models: {
+    base: {
+      model: "anthropic/claude-4-sonnet-20250514",
+      providerOptions: {
+        temperature: 0.7,
+        maxTokens: 4096
+      }
+    },
+    structuredOutput: {
+      model: "openai/gpt-4o-mini-2024-07-18",
+      providerOptions: {
+        temperature: 0.1,
+        maxTokens: 2048
+      }
+    },
+    summarizer: {
+      model: "openai/gpt-4o-mini-2024-07-18",
+      providerOptions: {
+        temperature: 0.3,
+        maxTokens: 1024
+      }
+    }
+  }
+}
+```
+
+### StopWhen Configuration
+
+Configure default stopping conditions that apply across your project:
+
+```typescript
+{
+  id: "my-project",
+  stopWhen: {
+    transferCountIs: 5,    // Max transfers within a single conversation/session
+    stepCountIs: 20       // Max generation steps per individual agent execution
+  }
+}
+```
+
+## Configuration Inheritance
+
+The framework uses a cascading inheritance system with specific rules for different configuration types:
+
+### Model Inheritance - Partial Cascading
+**Project** → **Graph** → **Agent**
+
+The framework supports **partial cascading**, meaning each level can override specific model types while inheriting others. This provides maximum flexibility while maintaining sensible defaults.
+
+#### How Partial Cascading Works
+
+Each model type (`base`, `structuredOutput`, `summarizer`) cascades independently:
+
+```typescript
+// Project Level - Sets defaults for all graphs
+Project: {
+  models: {
+    base: { model: "claude-4-sonnet" },
+    structuredOutput: { model: "gpt-4o-mini" },
+    summarizer: { model: "gpt-4o-mini" }
+  }
+}
+
+// Graph Level - Partially overrides project defaults
+Graph: {
+  models: {
+    base: { model: "gpt-4o" }  // Override: use different base model
+    // structuredOutput: INHERITED from project (gpt-4o-mini)
+    // summarizer: INHERITED from project (gpt-4o-mini)
+  }
+}
+
+// Agent Level - Can override any inherited model
+Agent: {
+  models: {
+    summarizer: { model: "claude-3-haiku" }  // Override: use faster summarizer
+    // base: INHERITED from graph (gpt-4o) 
+    // structuredOutput: INHERITED from project (gpt-4o-mini)
+  }
+}
+```
+
+#### Final Resolution Example
+
+In the above example, the agent ends up with:
+- **base**: `gpt-4o` (from graph)
+- **structuredOutput**: `gpt-4o-mini` (from project)
+- **summarizer**: `claude-3-haiku` (from agent)
+
+#### Provider Options Override
+
+When a model is overridden at any level, the entire configuration (including provider options) is replaced:
+
+```typescript
+// Project defines base model with options
+Project: {
+  models: {
+    base: {
+      model: "claude-4-sonnet",
+      providerOptions: {
+        temperature: 0.7,
+        maxTokens: 4096
+      }
+    }
+  }
+}
+
+// Agent completely overrides the base model settingsuration
+Agent: {
+  models: {
+    base: {
+      model: "claude-4-sonnet", // Same model
+      providerOptions: {
+        temperature: 0.3,  // New temperature
+        maxTokens: 2048    // New maxTokens - project maxTokens is NOT inherited
+      }
+    }
+  }
+}
+```
+
+#### Fallback to Base Model
+
+**Important**: `structuredOutput` and `summarizer` only fall back to the `base` model when there's nothing to inherit from higher levels (project/graph).
+
+#### System Defaults
+
+When no model settings are configured at any level (project, graph, or agent), the system uses these defaults:
+
+- **Default base model**: `anthropic/claude-4-sonnet-20250514`
+- **Default structured output model**: `openai/gpt-4.1-mini-2025-04-14`  
+- **Default summarizer model**: `openai/gpt-4.1-nano-2025-04-14`
+
+**Required API Keys**: For the system defaults to work properly, you need both:
+- `ANTHROPIC_API_KEY` (for the base model)
+- `OPENAI_API_KEY` (for structured output and summarizer models)
+
+```typescript
+// No higher-level defaults - fallback to base occurs
+Project: {
+  // No models configured
+}
+
+Graph: {
+  // No models configured  
+}
+
+Agent: {
+  models: {
+    base: {
+      model: "gpt-4o",
+      providerOptions: {
+        temperature: 0.7,
+        maxTokens: 2048
+      }
+    }
+    // No structuredOutput or summarizer specified
+  }
+}
+```
+
+**Final Resolution with Fallback:**
+- **base**: `gpt-4o` with specified provider options (from agent)
+- **structuredOutput**: `gpt-4o` with same provider options (falls back to agent's base)
+- **summarizer**: `gpt-4o` with same provider options (falls back to agent's base)
+
+**Contrast with Inheritance:**
+```typescript
+// Project has summarizer configured - inheritance takes priority
+Project: {
+  models: {
+    summarizer: { model: "gpt-4o-mini" }
+  }
+}
+
+Agent: {
+  models: {
+    base: { model: "gpt-4o" }
+  }
+}
+```
+
+**Final Resolution with Inheritance:**
+- **base**: `gpt-4o` (from agent)
+- **summarizer**: `gpt-4o-mini` (inherited from project - NO fallback to agent's base)
+- **structuredOutput**: Falls back to agent's base `gpt-4o` (no inheritance available, so fallback occurs)
+
+### StopWhen Inheritance
+Different cascade rules apply based on the control scope:
+
+- **`transferCountIs`**: Controls graph-level behavior → **Project** → **Graph** only
+- **`stepCountIs`**: Controls individual agent behavior → **Project** → **Graph** → **Agent**
+
+```typescript
+// Project sets defaults
+Project: {
+  stopWhen: {
+    transferCountIs: 5,   // Max transfers per conversation
+    stepCountIs: 15      // Max steps per agent
+  }
+}
+
+// Graph can override transfer limit, inherits step limit
+Graph: {
+  stopWhen: {
+    transferCountIs: 8    // Override: allow more transfers in this graph
+    // stepCountIs: 15 (inherited from project)
+  }
+}
+
+// Individual agent can override its own step limit
+Agent: {
+  stopWhen: {
+    stepCountIs: 25      // This agent can take more steps
+    // transferCountIs not applicable at agent level
+  }
+}
+```
+
+## Switching Between Projects
+
+Use the project switcher in the bottom left of the sidebar to quickly switch between projects. The switcher shows:
+- The project name (or ID if no name is set)
+- The project ID
+- A brief description (if provided)
+
+## API Access
+
+Projects can be accessed programmatically via the CRUD API:
+
+```typescript
+// List all projects
+GET /tenants/{tenantId}/crud/projects
+
+// Get a specific project
+GET /tenants/{tenantId}/crud/projects/{projectId}
+
+// Create a new project
+POST /tenants/{tenantId}/crud/projects
+{
+  "id": "my-project",
+  "name": "My Project",
+  "description": "A project for my AI agents"
+}
+
+// Update a project
+PATCH /tenants/{tenantId}/crud/projects/{projectId}
+{
+  "name": "Updated Name",
+  "description": "Updated description"
+}
+
+// Delete a project
+DELETE /tenants/{tenantId}/crud/projects/{projectId}
+```
+
+## Best Practices
+
+1. **Use descriptive IDs**: Choose project IDs that clearly indicate their purpose (e.g., `customer-support`, `internal-tools`)
+
+2. **Separate by environment**: Create different projects for development, staging, and production
+
+3. **Document your projects**: Use the description field to explain what each project is for
+
+4. **Organize by application**: Group related agents and tools within the same project
+
+## Next Steps
+
+After creating a project, you can:
+- [Create your first agent graph](/docs/features/agent-graphs)
+- [Configure MCP servers for tools](/docs/features/mcp-servers)
+- [Set up API keys for external access](/docs/features/api-keys)

@@ -1,0 +1,525 @@
+---
+title: CLI Reference
+description: Complete reference for the Inkeep CLI commands
+---
+
+## Overview
+
+The Inkeep CLI is the primary tool for interacting with the Inkeep Agent Framework. It allows you to push agent configurations and interact with your multi-agent system.
+
+## Installation
+
+```bash
+npm install -g @inkeep/agents-cli
+```
+
+## Global Options
+
+All commands support the following global options:
+
+- `--version` - Display CLI version
+- `--help` - Display help for a command
+
+## Commands
+
+### `inkeep init`
+
+Initialize a new Inkeep configuration file in your project.
+
+```bash
+inkeep init [path]
+```
+
+**Options:**
+
+- `--no-interactive` - Skip interactive path selection
+
+**Example:**
+
+```bash
+# Interactive initialization
+inkeep init
+
+# Initialize in specific directory
+inkeep init ./my-project
+
+# Non-interactive mode
+inkeep init --no-interactive
+```
+
+### `inkeep push`
+
+**Primary use case:** Push a TypeScript file containing agent configurations to your server. This is the main workflow for deploying agents.
+
+```bash
+inkeep push <graph-path>
+```
+
+**Arguments:**
+
+- `graph-path` - Path to the TypeScript file containing your agent graph
+
+**Options:**
+
+- `--tenant-id <id>` - Tenant ID (use with --api-url)
+- `--api-url <url>` - API URL (use with --tenant-id or alone to override config)
+- `--config-file-path <path>` - Path to configuration file
+
+#### Project Validation
+
+When pushing an agent graph, the CLI will automatically validate that the target project exists in your local database. This prevents accidentally pushing graphs to non-existent projects.
+
+**Behavior:**
+
+1. The CLI checks if the project specified in your `inkeep.config.ts` exists
+2. If the project doesn't exist, you'll be prompted to create it interactively
+3. You can provide a project name and optional description
+4. Once created, the push operation continues automatically
+
+**Example:**
+
+```bash
+$ inkeep push my-graph.ts
+
+✓ Configuration loaded
+✓ Validating project...
+⚠ Project "my-project-id" does not exist
+? Project "my-project-id" does not exist. Would you like to create it? Yes
+? Enter a name for the project: My Project
+? Enter a description for the project (optional): A demo project
+✓ Project "My Project" created successfully
+✓ Graph "my-graph" pushed successfully
+```
+
+The CLI will:
+
+1. Parse and validate your TypeScript file
+2. Extract agent definitions and relationships
+3. Deploy the configuration to your server
+4. Make the agents available for interaction
+
+### `inkeep pull`
+
+Pull an agent graph configuration from the server and save it locally as either a TypeScript or JSON file.
+
+```bash
+inkeep pull <graph-id>
+```
+
+**Arguments:**
+
+- `graph-id` - ID of the graph to pull from the server
+
+**Options:**
+
+- `--tenant-id <id>` - Tenant ID (use with --api-url)
+- `--api-url <url>` - API URL (use with --tenant-id or alone to override config)
+- `--config-file-path <path>` - Path to configuration file
+- `--output-path <path>` - Output directory for the generated file (default: ./agent-configurations)
+- `--json` - Output as JSON file instead of TypeScript
+- `--max-retries <number>` - Maximum number of retries for TypeScript generation (default: 3)
+
+#### TypeScript Generation (Default)
+
+By default, the pull command generates a TypeScript file using an LLM. This process includes:
+
+1. **LLM Generation**: Uses your configured model to convert the JSON graph data into TypeScript code
+2. **Validation**: Automatically validates the generated TypeScript by converting it back to JSON and comparing with the original
+3. **Retry Logic**: If validation fails, automatically retries with improved prompts (up to `--max-retries` times)
+
+**Example TypeScript generation:**
+
+```bash
+# Pull graph as TypeScript (requires modelConfig)
+inkeep pull my-graph-id
+
+# Pull with custom output directory and retry settings
+inkeep pull my-graph-id --output-path ./graphs --max-retries 5
+```
+
+#### JSON Output
+
+Use the `--json` flag to output the raw graph data as JSON without LLM processing:
+
+**Example JSON output:**
+
+```bash
+# Pull graph as JSON
+inkeep pull my-graph-id --json
+
+# Pull to specific directory as JSON
+inkeep pull my-graph-id --json --output-path ./data
+```
+
+#### Model Configuration
+
+For TypeScript generation, you can configure an LLM model in your `inkeep.config.ts`:
+
+```typescript
+export default defineConfig({
+  tenantId: "your-tenant-id",
+  projectId: "your-project-id",
+  apiUrl: "https://api.inkeep.com",
+  modelConfig: {
+    model: "anthropic/claude-3-5-sonnet-20241022",
+    providerOptions: {
+      anthropic: {},
+    },
+  },
+});
+```
+
+**Default Model**: If no model is specified in the configuration, the CLI defaults to `anthropic/claude-4-sonnet-20250514`.
+
+**Supported Providers**:
+
+- **Anthropic**: `anthropic/claude-3-5-sonnet-20241022`, `anthropic/claude-4-sonnet-20250514`, etc
+- **OpenAI**: `openai/gpt-4`, `openai/gpt-4-turbo`, etc.
+
+**Minimal Configuration**: You can omit the `model` field to use the default:
+
+```typescript
+modelConfig: {
+  providerOptions: {
+    anthropic: {}, // Uses default Anthropic model
+  },
+},
+```
+
+#### Validation Process
+
+When generating TypeScript files, the CLI performs automatic validation:
+
+1. **Round-trip Test**: Converts the generated TypeScript back to JSON
+2. **Comparison**: Compares the result with the original graph data
+3. **Difference Detection**: Identifies any discrepancies in structure or data
+4. **Retry on Failure**: Automatically retries with improved prompts if validation fails
+5. **Detailed Reporting**: Shows specific differences if validation ultimately fails
+
+**Example with validation:**
+
+```bash
+$ inkeep pull my-graph-id
+
+✓ Configuration loaded
+✓ Fetching graph from API...
+✓ Generating TypeScript file with LLM...
+✓ Validating generated TypeScript file...
+✓ TypeScript file validation passed
+✅ Generated TypeScript file matches original graph data
+✅ TypeScript file created: ./agent-configurations/my-graph-id.graph.ts
+
+✨ Next steps:
+  • Edit the file: ./agent-configurations/my-graph-id.graph.ts
+  • Test locally: inkeep push ./agent-configurations/my-graph-id.graph.ts
+  • Version control: git add ./agent-configurations/my-graph-id.graph.ts
+```
+
+### `inkeep chat`
+
+Start an interactive chat session with a deployed agent graph.
+
+```bash
+inkeep chat [graph-id]
+```
+
+**Arguments:**
+
+- `graph-id` - Optional graph ID (interactive selection if not provided)
+
+**Options:**
+
+- `--tenant-id <id>` - Tenant ID
+- `--api-url <url>` - API URL
+- `--config-file-path <path>` - Path to configuration file
+
+**Example:**
+
+```bash
+# Interactive graph selection
+inkeep chat
+
+# Chat with specific graph
+inkeep chat my-agent-graph
+
+# Use custom API endpoint
+inkeep chat --api-url http://localhost:3002
+```
+
+### `inkeep list-graphs`
+
+List all available agent graphs for the current tenant.
+
+```bash
+inkeep list-graphs
+```
+
+**Options:**
+
+- `--tenant-id <id>` - Tenant ID
+- `--api-url <url>` - API URL
+- `--config-file-path <path>` - Path to configuration file
+
+**Example:**
+
+```bash
+inkeep list-graphs
+```
+
+### `inkeep config`
+
+Manage Inkeep configuration settings.
+
+#### `inkeep config get`
+
+Get configuration value(s).
+
+```bash
+inkeep config get [key]
+```
+
+**Arguments:**
+
+- `key` - Optional configuration key to retrieve
+
+**Options:**
+
+- `--config-file-path <path>` - Path to configuration file
+
+**Example:**
+
+```bash
+# Get all config values
+inkeep config get
+
+# Get specific value
+inkeep config get apiUrl
+```
+
+#### `inkeep config set`
+
+Set a configuration value.
+
+```bash
+inkeep config set <key> <value>
+```
+
+**Arguments:**
+
+- `key` - Configuration key
+- `value` - Configuration value
+
+**Options:**
+
+- `--config-file-path <path>` - Path to configuration file
+
+**Example:**
+
+```bash
+inkeep config set apiUrl http://localhost:3002
+inkeep config set tenantId my-tenant-id
+```
+
+#### `inkeep config list`
+
+List all configuration values.
+
+```bash
+inkeep config list
+```
+
+**Options:**
+
+- `--config-file-path <path>` - Path to configuration file
+
+## Configuration File
+
+The CLI uses a configuration file (typically `inkeep.config.ts` or `inkeep.config.json`) to store settings:
+
+```typescript
+// inkeep.config.ts
+import { defineConfig } from "@inkeep/agents-cli";
+
+export default defineConfig({
+  tenantId: "your-tenant-id",
+  projectId: "your-project-id",
+  apiUrl: "https://api.inkeep.com",
+  // Additional configuration options
+});
+```
+
+### Configuration Priority
+
+Configuration values are resolved in the following order:
+
+1. Command-line arguments
+2. `inkeep.config.ts` file
+3. Environment variables
+
+## Environment Variables
+
+The CLI respects the following environment variables:
+
+- `INKEEP_TENANT_ID` - Default tenant ID
+- `INKEEP_API_URL` - Default API URL
+- `INKEEP_CONFIG_PATH` - Path to configuration file
+- `DB_FILE_NAME` - Database file location (default: `local.db`)
+
+## Database
+
+The CLI uses a local SQLite database (`local.db` by default) to store project and graph metadata. You can override the database location using the `DB_FILE_NAME` environment variable:
+
+```bash
+DB_FILE_NAME=my-database.db inkeep push graph.ts
+```
+
+## Common Workflows
+
+### Deploy a New Agent Graph
+
+1. Create your agent configuration in TypeScript:
+
+```typescript
+// src/agents/my-graph.ts
+import { agent, agentGraph } from "@inkeep/framework";
+
+const myAgent = agent({
+  id: "my-agent",
+  name: "My Agent",
+  prompt: "Help users with tasks",
+});
+
+export const graph = agentGraph({
+  defaultAgent: myAgent,
+  agents: () => [myAgent],
+});
+```
+
+2. Push the configuration:
+
+```bash
+inkeep push src/agents/my-graph.ts
+```
+
+3. Start chatting:
+
+```bash
+inkeep chat my-graph
+```
+
+### Local Development Setup
+
+1. Initialize configuration:
+
+```bash
+inkeep init
+```
+
+2. Start your local server:
+
+```bash
+pnpm dev
+```
+
+3. Push your agent configuration:
+
+```bash
+inkeep push src/agents/graph.ts
+```
+
+4. Begin interactive chat:
+
+```bash
+inkeep chat
+```
+
+### Pull and Modify Existing Graph
+
+1. List available graphs:
+
+```bash
+inkeep list-graphs
+```
+
+2. Pull an existing graph configuration:
+
+```bash
+inkeep pull existing-graph-id
+```
+
+3. Edit the generated TypeScript file:
+
+```bash
+# File created at: ./existing-graph-id.graph.ts
+```
+
+4. Push your modifications:
+
+```bash
+inkeep push ./existing-graph-id.graph.ts
+```
+
+5. Test the updated graph:
+
+```bash
+inkeep chat existing-graph-id
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**Cannot connect to API:**
+
+- Verify your API URL is correct: `inkeep config get apiUrl`
+- Ensure your server is running if using local development
+- Check network connectivity
+
+**Graph push fails:**
+
+- Ensure TypeScript file exports a valid agent graph
+- Check for syntax errors in your configuration
+- Verify all required agent properties are defined
+
+**Graph pull fails:**
+
+- Verify the graph ID exists: `inkeep list-graphs`
+- Ensure you have access to the graph with your current tenant/project configuration
+- Check network connectivity to the API server
+
+**TypeScript generation fails:**
+
+- Ensure `modelConfig` is properly configured in your `inkeep.config.ts` (uses `anthropic/claude-4-sonnet-20250514` by default if no model specified)
+- Check that your model provider (e.g., Anthropic) credentials are set up
+- Try using `--json` flag as a fallback to get the raw graph data
+- Increase retry attempts: `inkeep pull graph-id --max-retries 5`
+
+**Validation errors during pull:**
+
+- The generated TypeScript may have syntax errors or missing dependencies
+- Check the generated file manually for obvious issues
+- Try pulling as JSON first to verify the source data: `inkeep pull graph-id --json`
+- Consider using a different model in your `modelConfig` if issues persist
+
+**Project Not Found:**
+
+- If you see an error about a project not existing when pushing a graph:
+  1. The CLI will prompt you to create the project
+  2. Alternatively, ensure your `projectId` in `inkeep.config.ts` matches an existing project
+  3. Check that your database file exists and is accessible
+
+**Database Connection Issues:**
+
+- Ensure the database file path is correct
+- Check file permissions for the database
+- Try using an absolute path for `DB_FILE_NAME`
+
+### Getting Help
+
+For additional help with any command:
+
+```bash
+inkeep [command] --help
+```
+
+For issues or feature requests, visit: [GitHub Issues](https://github.com/inkeep/agents/issues)

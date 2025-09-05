@@ -1,0 +1,45 @@
+#!/bin/sh
+# Pre-push hook for Agent Framework
+# 
+# This hook runs before each push to ensure code quality.
+# It performs the following checks:
+#   1. Type checking (can be skipped with SKIP_TYPECHECK=1)
+#   2. Test suite (always runs)
+#
+# Usage:
+#   Normal push:                      git push
+#   Skip typecheck only:              SKIP_TYPECHECK=1 git push  
+#   Skip all hooks (use sparingly):   git push --no-verify
+#
+# For more information, see CONTRIBUTING.md
+
+# Get current branch name
+BRANCH_NAME=$(git symbolic-ref --short HEAD)
+
+# Only run hooks on main branch
+if [ "$BRANCH_NAME" != "main" ]; then
+  echo "⚡ Skipping pre-push hooks (not on main branch)"
+  exit 0
+fi
+
+# Type checking - ensures type safety across all packages
+# Can be skipped for WIP pushes or when only touching non-TS files
+if [ "$SKIP_TYPECHECK" = "1" ]; then
+  echo "⚡ Skipping typecheck (SKIP_TYPECHECK=1)"
+else
+  echo "🔍 Running typecheck..."
+  # Run typecheck
+  if ! pnpm typecheck; then
+    echo "❌ Type errors found. Fix them or use SKIP_TYPECHECK=1 git push to bypass (use sparingly!)"
+    exit 1
+  fi
+  echo "✅ Typecheck passed"
+fi
+
+# Test suite - always runs to prevent broken code from being pushed
+echo "🧪 Running tests..."
+if ! pnpm test; then
+  echo "❌ Tests failed. Fix them before pushing."
+  exit 1
+fi
+echo "✅ Tests passed"
