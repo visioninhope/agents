@@ -1,23 +1,39 @@
-import { resolve } from 'path';
 import { defineConfig } from 'vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
 
 export default defineConfig({
   plugins: [tsconfigPaths()],
   build: {
+    target: 'node20',
     lib: {
-      entry: resolve(__dirname, 'src/index.ts'),
-      name: 'InkeepCLI',
-      fileName: 'index',
+      entry: 'src/index.ts',
       formats: ['es'],
+      fileName: 'index',
     },
     rollupOptions: {
-      external: ['keytar'],
+      external: [
+        // Keep all node_modules external
+        'commander',
+        'chalk',
+        'inquirer',
+        'inquirer-autocomplete-prompt',
+        'ora',
+        'cli-table3',
+        'dotenv',
+        'drizzle-orm',
+        '@libsql/client',
+        'ai',
+        'ts-morph',
+        'recast',
+        'ast-types',
+        '@babel/parser',
+        '@babel/types',
+        '@ai-sdk/anthropic',
+        '@ai-sdk/openai',
+        'keytar',
+        '@inkeep/agents-core',
+      ],
     },
-    outDir: 'dist',
-    emptyOutDir: true,
-  },
-  optimizeDeps: {
-    exclude: ['keytar'],
+    sourcemap: true,
   },
 });

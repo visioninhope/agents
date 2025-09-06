@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "ES2022",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "strict": true,
@@ -15,10 +15,10 @@
     "baseUrl": ".",
     "paths": {
       "@inkeep/agents-core": [
-        "../packages/agents-core/dist/index.js"
+        "../packages/agents-core/src/index.ts"
       ],
       "@inkeep/agents-core/*": [
-        "../packages/agents-core/dist/*"
+        "../packages/agents-core/src/*"
       ]
     }
   },
