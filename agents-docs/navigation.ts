@@ -44,8 +44,15 @@ export default {
         'talk-to-your-agents/overview',
         'talk-to-your-agents/authentication',
         'talk-to-your-agents/mcp-server',
-        // 'talk-to-your-agents/react',
-        // 'talk-to-your-agents/a2a',
+        {
+          group: 'React UI Components',
+          pages: [
+            'talk-to-your-agents/react/chat-button',
+            'talk-to-your-agents/react/custom-trigger',
+            'talk-to-your-agents/react/side-bar-chat',
+            'talk-to-your-agents/react/embedded-chat',
+          ],
+        }
       ],
     },
     {
@@ -53,7 +60,7 @@ export default {
       pages: ['api-reference/authentication', 'api-reference'],
     },
     /**
-     * TODO: Add back in
+     * TODO: Add back schema validation back in some way
      */
     // {
     //   group: 'UI Components',
