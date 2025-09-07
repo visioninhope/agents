@@ -130,17 +130,18 @@ Instead of self-hosting Nango, you can use Nango Cloud:
 
 #### Configure Application Environment Files
 
-**`/configuration/.env`**
+**`/agents-manage-api/.env` and `/agents-run-api/.env`**
+
 ```bash
 # Nango Cloud configuration
-NANGO_SECRET_KEY="nango_sk_..."
+NANGO_SECRET_KEY="123abc..."
 # Leave NANGO_HOST unset to use Nango Cloud
 ```
 
-**`/agent-builder/.env`**
+**`/agents-manage-ui/.env`**
 ```bash
 # Nango Cloud configuration (server-side calls)
-NANGO_SECRET_KEY="nango_sk_..."
+NANGO_SECRET_KEY="123abc..."
 # Leave NEXT_PUBLIC_NANGO_HOST and NEXT_PUBLIC_NANGO_CONNECT_BASE_URL unset
 ```
 
