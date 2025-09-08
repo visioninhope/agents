@@ -6,8 +6,12 @@ import {
   trace,
 } from '@opentelemetry/api';
 import { getLogger } from './logger.js';
+import { env } from '../env.js';
 
 const logger = getLogger('tracer');
+
+// Environments where trace force flush should be enabled
+const FORCE_FLUSH_ENVIRONMENTS: readonly string[] = ['development'];
 
 // Base prefix for all span names - export this to use in other files
 export const BASE = 'inkeep-chat';
@@ -110,6 +114,15 @@ export function getGlobalTracer(): Tracer {
  * is sent before the operation completes or fails
  */
 export async function forceFlushTracer(): Promise<void> {
+  const isOtelTracesForceFlushEnabled = env.OTEL_TRACES_FORCE_FLUSH_ENABLED;
+  const isForceFlushEnvironment = env.ENVIRONMENT && FORCE_FLUSH_ENVIRONMENTS.includes(env.ENVIRONMENT);
+
+  const shouldForceFlush =
+    isOtelTracesForceFlushEnabled === true || (isOtelTracesForceFlushEnabled == null && isForceFlushEnvironment);
+
+  if (!shouldForceFlush) {
+    return;
+  }
   try {
     // Get the tracer provider and force flush if available
     const tracerProvider = trace.getTracerProvider();
