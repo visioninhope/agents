@@ -1,4 +1,8 @@
-# Elastic License 
+# Inkeep SDK – Elastic License 2.0 with Supplemental Terms
+
+NOTE: The Inkeep SDK is licensed under the Elastic License 2.0 (ELv2), subject to Supplemental Terms included in [SUPPLEMENTAL_TERMS.md](SUPPLEMENTAL_TERMS.md). In the event of conflict, the Supplemental Terms control.
+
+# Elastic License 2.0
 
 ## Acceptance  
 By using the software, you agree to all of the terms and conditions below.
