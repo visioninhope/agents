@@ -9,6 +9,7 @@ import { type Span, SpanStatusCode } from '@opentelemetry/api';
 import { getLogger } from '../utils/logger';
 import { createSpanName, forceFlushTracer, getGlobalTracer } from '../utils/tracer';
 import { ContextResolver, type ResolvedContext } from './ContextResolver';
+import { CredentialStoreRegistry } from '../credential-stores/CredentialStoreRegistry';
 
 const logger = getLogger('context');
 
@@ -43,7 +44,8 @@ async function handleContextConfigChange(
   conversationId: string,
   graphId: string,
   newContextConfigId: string,
-  dbClient: DatabaseClient
+  dbClient: DatabaseClient,
+  credentialStores?: CredentialStoreRegistry
 ): Promise<void> {
   const conversation = await getConversation(dbClient)({
     scopes: { tenantId, projectId },
@@ -55,7 +57,7 @@ async function handleContextConfigChange(
   // a possibility of config change since we don't store contextConfigId in conversations
   if (conversation.lastContextResolution) {
     // Context config might have changed - clear cache for this conversation
-    const contextResolver = new ContextResolver(tenantId, projectId, dbClient);
+    const contextResolver = new ContextResolver(tenantId, projectId, dbClient, credentialStores);
     await contextResolver.clearCache(tenantId, projectId, conversationId);
 
     logger.info(
@@ -76,7 +78,8 @@ async function handleContextResolution(
   conversationId: string,
   graphId: string,
   requestContext: Record<string, unknown>,
-  dbClient: DatabaseClient
+  dbClient: DatabaseClient,
+  credentialStores?: CredentialStoreRegistry
 ): Promise<ResolvedContext | null> {
   // Create parent span for the entire context resolution process
   return tracer.startActiveSpan(
@@ -108,7 +111,8 @@ async function handleContextResolution(
           conversationId,
           graphId,
           agentGraph.contextConfigId,
-          dbClient
+          dbClient,
+          credentialStores
         );
 
         // 3. Determine trigger based on conversation state
@@ -133,7 +137,12 @@ async function handleContextResolution(
         }
 
         // 5. Resolve context based on trigger
-        const contextResolver = new ContextResolver(tenantId, projectId, dbClient);
+        const contextResolver = new ContextResolver(
+          tenantId,
+          projectId,
+          dbClient,
+          credentialStores
+        );
 
         // Resolve unified context with appropriate trigger for cache invalidation
         const contextResult = await contextResolver.resolve(contextConfig, {

@@ -7,6 +7,7 @@ import type { DatabaseClient } from '../db/client';
 import type { ContextConfigSelect } from '../types/entities';
 import { getRequestExecutionContext } from '../utils/execution';
 import { getLogger } from '../utils/logger';
+import { CredentialStoreRegistry } from '../credential-stores/CredentialStoreRegistry';
 
 const logger = getLogger('context-validation');
 
@@ -285,15 +286,17 @@ async function fetchExistingRequestContext({
   contextConfig,
   conversationId,
   dbClient,
+  credentialStores,
 }: {
   tenantId: string;
   projectId: string;
   contextConfig: ContextConfigSelect;
   conversationId: string;
   dbClient: DatabaseClient;
+  credentialStores?: CredentialStoreRegistry;
 }) {
   //If no request context is provided, but this is a continued conversation first try to get the request context from the context cache
-  const contextResolver = new ContextResolver(tenantId, projectId, dbClient);
+  const contextResolver = new ContextResolver(tenantId, projectId, dbClient, credentialStores);
   const requestContext = await contextResolver.resolveRequestContext(
     conversationId,
     contextConfig.id
@@ -321,6 +324,7 @@ export async function validateRequestContext(
   conversationId: string,
   parsedRequest: ParsedHttpRequest,
   dbClient: DatabaseClient,
+  credentialStores?: CredentialStoreRegistry,
   legacyRequestContext?: Record<string, unknown> // legacy request context if it was included in the request body
 ): Promise<ContextValidationResult> {
   try {
@@ -397,6 +401,7 @@ export async function validateRequestContext(
             contextConfig,
             conversationId,
             dbClient,
+            credentialStores,
           });
         } catch (_error) {
           validationResult.errors.push({
@@ -465,6 +470,7 @@ export async function validateRequestContext(
             contextConfig,
             conversationId,
             dbClient,
+            credentialStores,
           });
         } catch (error) {
           // Cache fallback failed, return original validation errors
@@ -564,6 +570,7 @@ export function contextValidationMiddleware(dbClient: DatabaseClient) {
       c.req.raw.headers.forEach((value, key) => {
         headers[key.toLowerCase()] = value;
       });
+      const credentialStores = c.get('credentialStores') as CredentialStoreRegistry;
 
       const parsedRequest = {
         body: body || {},
@@ -580,6 +587,7 @@ export function contextValidationMiddleware(dbClient: DatabaseClient) {
         conversationId,
         parsedRequest,
         dbClient,
+        credentialStores,
         body.requestContext
       );
 

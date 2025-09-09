@@ -13,6 +13,7 @@ function createMCPSchema<T>(schema: z.ZodType<T>): any {
 
 import type { ExecutionContext } from '@inkeep/agents-core';
 import {
+  CredentialStoreRegistry,
   createMessage,
   createOrGetConversation,
   getAgentById,
@@ -297,7 +298,8 @@ const executeAgentQuery = async (
 const getServer = async (
   requestContext: Record<string, unknown>,
   executionContext: ExecutionContext,
-  conversationId: string
+  conversationId: string,
+  credentialStores?: CredentialStoreRegistry
 ) => {
   const { tenantId, projectId, graphId } = executionContext;
   setupTracing(conversationId, tenantId, graphId);
@@ -352,7 +354,8 @@ const getServer = async (
           conversationId,
           graphId,
           requestContext,
-          dbClient
+          dbClient,
+          credentialStores
         );
 
         logger.info(
@@ -387,7 +390,11 @@ const getServer = async (
   return server;
 };
 
-const app = new OpenAPIHono();
+type AppVariables = {
+  credentialStores: CredentialStoreRegistry;
+};
+
+const app = new OpenAPIHono<{ Variables: AppVariables }>();
 
 // Only apply context validation to POST requests (GET requests are for SSE streams)
 app.use('/', async (c, next) => {
@@ -438,7 +445,8 @@ const handleInitializationRequest = async (
   validatedContext: Record<string, unknown>,
   req: any,
   res: any,
-  c: any
+  c: any,
+  credentialStores?: CredentialStoreRegistry
 ) => {
   const { tenantId, projectId, graphId } = executionContext;
   logger.info({ body }, 'Received initialization request');
@@ -486,7 +494,7 @@ const handleInitializationRequest = async (
     sessionIdGenerator: () => sessionId,
   });
 
-  const server = await getServer(validatedContext, executionContext, sessionId);
+  const server = await getServer(validatedContext, executionContext, sessionId, credentialStores);
   await server.connect(transport);
   logger.info({ sessionId }, 'Server connected for initialization');
 
@@ -516,7 +524,8 @@ const handleExistingSessionRequest = async (
   executionContext: ExecutionContext,
   validatedContext: Record<string, unknown>,
   req: any,
-  res: any
+  res: any,
+  credentialStores?: CredentialStoreRegistry
 ) => {
   const { tenantId, projectId, graphId } = executionContext;
   // Validate the session id
@@ -541,7 +550,7 @@ const handleExistingSessionRequest = async (
     sessionIdGenerator: () => sessionId,
   });
 
-  const server = await getServer(validatedContext, executionContext, sessionId);
+  const server = await getServer(validatedContext, executionContext, sessionId, credentialStores);
   await server.connect(transport);
 
   // Spoof initialization to set the transport's _initialized flag
@@ -637,6 +646,7 @@ app.openapi(
       const isInitRequest = body.method === 'initialize';
       const { req, res } = toReqRes(c.req.raw);
       const validatedContext = (c as any).get('validatedContext') || {};
+      const credentialStores = c.get('credentialStores');
       logger.info({ validatedContext }, 'Validated context');
       logger.info({ req }, 'request');
       if (isInitRequest) {
@@ -646,7 +656,8 @@ app.openapi(
           validatedContext,
           req,
           res,
-          c
+          c,
+          credentialStores
         );
       } else {
         return await handleExistingSessionRequest(
@@ -654,7 +665,8 @@ app.openapi(
           executionContext,
           validatedContext,
           req,
-          res
+          res,
+          credentialStores
         );
       }
     } catch (e) {

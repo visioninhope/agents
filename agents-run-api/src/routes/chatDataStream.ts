@@ -3,6 +3,7 @@ import {
   commonGetErrorResponses,
   contextValidationMiddleware,
   createMessage,
+  CredentialStoreRegistry,
   getActiveAgentForConversation,
   getAgentById,
   getAgentGraphWithDefaultAgent,
@@ -19,7 +20,11 @@ import { ExecutionHandler } from '../handlers/executionHandler';
 import { getLogger } from '../logger';
 import { createVercelStreamHelper } from '../utils/stream-helpers';
 
-const app = new OpenAPIHono();
+type AppVariables = {
+  credentialStores: CredentialStoreRegistry;
+};
+
+const app = new OpenAPIHono<{ Variables: AppVariables }>();
 const logger = getLogger('chatDataStream');
 
 const chatDataStreamRoute = createRoute({
@@ -130,6 +135,7 @@ app.openapi(chatDataStreamRoute, async (c) => {
 
     // Get validated context from middleware (falls back to body.context if no validation)
     const validatedContext = (c as any).get('validatedContext') || body.requestContext || {};
+    const credentialStores = c.get('credentialStores');
 
     // Context resolution with intelligent conversation state detection
     await handleContextResolution(
@@ -138,7 +144,8 @@ app.openapi(chatDataStreamRoute, async (c) => {
       conversationId,
       graphId,
       validatedContext,
-      dbClient
+      dbClient,
+      credentialStores
     );
 
     // Store last user message

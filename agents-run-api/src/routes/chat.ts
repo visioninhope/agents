@@ -3,6 +3,7 @@ import {
   contextValidationMiddleware,
   createMessage,
   createOrGetConversation,
+  CredentialStoreRegistry,
   getActiveAgentForConversation,
   getAgentById,
   getAgentGraphWithDefaultAgent,
@@ -22,7 +23,11 @@ import { getLogger } from '../logger';
 import type { ContentItem, Message } from '../types/chat';
 import { createSSEStreamHelper } from '../utils/stream-helpers';
 
-const app = new OpenAPIHono();
+type AppVariables = {
+  credentialStores: CredentialStoreRegistry;
+};
+
+const app = new OpenAPIHono<{ Variables: AppVariables }>();
 const logger = getLogger('completionsHandler');
 
 // Define the OpenAPI route schema
@@ -255,6 +260,7 @@ app.openapi(chatCompletionsRoute, async (c) => {
 
     // Get validated context from middleware (falls back to body.context if no validation)
     const validatedContext = (c as any).get('validatedContext') || body.requestContext || {};
+    const credentialStores = c.get('credentialStores');
 
     // Context resolution with intelligent conversation state detection
     await handleContextResolution(
@@ -263,7 +269,8 @@ app.openapi(chatCompletionsRoute, async (c) => {
       conversationId,
       graphId,
       validatedContext,
-      dbClient
+      dbClient,
+      credentialStores
     );
 
     logger.info(
