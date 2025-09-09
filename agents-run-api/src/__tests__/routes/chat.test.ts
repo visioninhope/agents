@@ -1,6 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock logger - must mock the actual path used by app.ts
+// Mock logger - must mock both with and without .js extension for different module resolution
+vi.mock('../../logger.js', () => ({
+  getLogger: () => ({
+    info: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    warn: vi.fn(),
+    child: vi.fn().mockReturnThis(),
+  }),
+}));
+
 vi.mock('../../logger', () => ({
   getLogger: () => ({
     info: vi.fn(),
