@@ -30,7 +30,9 @@
     "typecheck": "turbo typecheck",
     "clean": "pnpm -r --parallel exec rm -rf node_modules dist build .next .turbo",
     "clean:turbo": "turbo clean",
-    "prepare": "husky"
+    "prepare": "husky",
+    "release": "changeset publish",
+    "release-dev": "changeset version --snapshot dev && changeset publish --tag dev"
   },
   "version": "0.1.0",
   "dependencies": {
@@ -38,6 +40,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.1.4",
+    "@changesets/cli": "^2.29.6",
     "husky": "^9.1.6",
     "lint-staged": "^16.1.5",
     "turbo": "^2.5.5"
