@@ -1,14 +1,15 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 // Hoist the mock function
-const { mockParsePartialJson } = vi.hoisted(() => ({
-  mockParsePartialJson: vi.fn(),
-}));
+const { mockParsePartialJson } = vi.hoisted(() => {
+  const fn = vi.fn();
+  return { mockParsePartialJson: fn };
+});
 
 // Mock parsePartialJson from 'ai' package
 vi.mock('ai', () => ({
   parsePartialJson: mockParsePartialJson,
-  tool: vi.fn().mockImplementation((config) => config),
+  tool: vi.fn((config) => config),
 }));
 
 import { parsePartialJson } from 'ai';
@@ -50,7 +51,7 @@ describe('VercelDataStreamHelper Memory Management', () => {
     await helper.writeContent(largeContent);
 
     // Should not throw and should continue working
-    expect(mockParsePartialJson).toHaveBeenCalled();
+    expect(mockParsePartialJson).toHaveBeenCalledTimes(3);
 
     // Check memory stats show buffer growth
     const stats = helper.getMemoryStats();

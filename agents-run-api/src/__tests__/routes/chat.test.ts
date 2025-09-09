@@ -1,4 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Mock logger before any imports
+vi.mock('../../logger.js', () => ({
+  getLogger: () => ({
+    info: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    warn: vi.fn(),
+    child: vi.fn().mockReturnThis(),
+  }),
+}));
+
+vi.mock('../../logger', () => ({
+  getLogger: () => ({
+    info: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    warn: vi.fn(),
+    child: vi.fn().mockReturnThis(),
+  }),
+}));
+
 import * as execModule from '../../handlers/executionHandler';
 import { makeRequest } from '../utils/testRequest';
 
