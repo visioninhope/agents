@@ -35,6 +35,13 @@ function createExecutionHono(
   // Request ID middleware
   app.use('*', requestId());
 
+  // Server config and credential stores middleware
+  app.use('*', async (c, next) => {
+    c.set('serverConfig', serverConfig);
+    c.set('credentialStores', credentialStores);
+    return next();
+  });
+
   // OpenTelemetry baggage middleware
   app.use('*', async (c, next) => {
     const reqId = c.get('requestId');
@@ -184,7 +191,6 @@ function createExecutionHono(
 
   // Baggage middleware for execution API - extracts context from API key authentication
   app.use('*', async (c, next) => {
-    
     // Get the API key context if available (set by auth middleware)
     const executionContext = c.get('executionContext');
 
@@ -222,14 +228,12 @@ function createExecutionHono(
       return next();
     }
 
-
     const bag = Object.entries(entries).reduce(
       (b, [key, value]) => b.setEntry(key, { value: value || '' }),
       propagation.getBaggage(otelContext.active()) ?? propagation.createBaggage()
     );
 
-
-    const ctxWithBag = propagation.setBaggage(otelContext.active(), bag);  
+    const ctxWithBag = propagation.setBaggage(otelContext.active(), bag);
     return otelContext.with(ctxWithBag, () => next());
   });
 
