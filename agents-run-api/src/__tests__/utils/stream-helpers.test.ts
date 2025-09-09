@@ -1,19 +1,22 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+
+// Hoist the mock function
+const { mockParsePartialJson } = vi.hoisted(() => ({
+  mockParsePartialJson: vi.fn(),
+}));
+
+// Mock parsePartialJson from 'ai' package
+vi.mock('ai', () => ({
+  parsePartialJson: mockParsePartialJson,
+  tool: vi.fn().mockImplementation((config) => config),
+}));
+
+import { parsePartialJson } from 'ai';
 import {
   createVercelStreamHelper,
   type VercelDataStreamHelper,
   type VercelUIWriter,
 } from '../../utils/stream-helpers';
-
-// Mock parsePartialJson from 'ai' package
-vi.mock('ai', () => ({
-  parsePartialJson: vi.fn(),
-  tool: vi.fn().mockImplementation((config) => config),
-}));
-
-import { parsePartialJson } from 'ai';
-
-const mockParsePartialJson = vi.mocked(parsePartialJson);
 
 describe('VercelDataStreamHelper Memory Management', () => {
   let mockWriter: VercelUIWriter;
