@@ -80,42 +80,95 @@ interface EdgeEditorProps {
 }
 
 function EdgeEditor({ selectedEdge }: EdgeEditorProps) {
-	const { updateEdgeData } = useReactFlow();
+	const { updateEdgeData, setEdges } = useReactFlow();
 	const sourceNode = useNodesData(selectedEdge.source);
 	const targetNode = useNodesData(selectedEdge.target);
 	const markUnsaved = useGraphStore((state) => state.markUnsaved);
 
+	// Check if this is a self-loop (source and target are the same)
+	const isSelfLoop = selectedEdge.source === selectedEdge.target;
+
 	const handleCheckboxChange = (id: string, checked: boolean) => {
-		updateEdgeData(selectedEdge.id, {
-			relationships: {
+		// Calculate the new relationships state
+		let newRelationships: A2AEdgeData["relationships"];
+		
+		if (isSelfLoop) {
+			// For self-loops, when we toggle the checkbox, we should set both directions
+			// to maintain consistency (a self-loop is inherently bidirectional)
+			const updates: Partial<A2AEdgeData["relationships"]> = {};
+			if (id === "transferSourceToTarget") {
+				updates.transferSourceToTarget = checked;
+				updates.transferTargetToSource = checked;
+			} else if (id === "delegateSourceToTarget") {
+				updates.delegateSourceToTarget = checked;
+				updates.delegateTargetToSource = checked;
+			}
+			newRelationships = {
+				...(selectedEdge.data?.relationships as A2AEdgeData["relationships"]),
+				...updates,
+			};
+		} else {
+			newRelationships = {
 				...(selectedEdge.data?.relationships as A2AEdgeData["relationships"]),
 				[id]: checked,
-			},
-		});
+			};
+		}
+
+		// Check if all relationships are now unchecked
+		const hasAnyRelationship = 
+			newRelationships.transferSourceToTarget ||
+			newRelationships.transferTargetToSource ||
+			newRelationships.delegateSourceToTarget ||
+			newRelationships.delegateTargetToSource;
+
+		if (!hasAnyRelationship) {
+			// Remove the edge if no relationships remain
+			setEdges((edges) => edges.filter((edge) => edge.id !== selectedEdge.id));
+		} else {
+			// Update the edge data with the new relationships
+			updateEdgeData(selectedEdge.id, {
+				relationships: newRelationships,
+			});
+		}
+		
 		markUnsaved();
 	};
 
-	const transferOptions = [
-		{
-			id: "transferSourceToTarget",
-			label: `${sourceNode?.data.name} can transfer to ${targetNode?.data.name}`,
-		},
-		{
-			id: "transferTargetToSource",
-			label: `${targetNode?.data.name} can transfer to ${sourceNode?.data.name}`,
-		},
-	];
+	const transferOptions = isSelfLoop
+		? [
+				{
+					id: "transferSourceToTarget",
+					label: `${sourceNode?.data.name} can transfer to itself`,
+				},
+		  ]
+		: [
+				{
+					id: "transferSourceToTarget",
+					label: `${sourceNode?.data.name} can transfer to ${targetNode?.data.name}`,
+				},
+				{
+					id: "transferTargetToSource",
+					label: `${targetNode?.data.name} can transfer to ${sourceNode?.data.name}`,
+				},
+		  ];
 
-	const delegateOptions = [
-		{
-			id: "delegateSourceToTarget",
-			label: `${sourceNode?.data.name} can delegate to ${targetNode?.data.name}`,
-		},
-		{
-			id: "delegateTargetToSource",
-			label: `${targetNode?.data.name} can delegate to ${sourceNode?.data.name}`,
-		},
-	];
+	const delegateOptions = isSelfLoop
+		? [
+				{
+					id: "delegateSourceToTarget",
+					label: `${sourceNode?.data.name} can delegate to itself`,
+				},
+		  ]
+		: [
+				{
+					id: "delegateSourceToTarget",
+					label: `${sourceNode?.data.name} can delegate to ${targetNode?.data.name}`,
+				},
+				{
+					id: "delegateTargetToSource",
+					label: `${targetNode?.data.name} can delegate to ${sourceNode?.data.name}`,
+				},
+		  ];
 
 	return (
 		<div className="space-y-8">
