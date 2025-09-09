@@ -1,39 +1,27 @@
 import { nanoid } from 'nanoid';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
+// Hoist logger mocks to ensure they're available before any module loads
+const mockLogger = vi.hoisted(() => ({
+  info: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  warn: vi.fn(),
+  child: vi.fn(),
+}));
+
+// Make child return itself for chaining
+mockLogger.child.mockReturnValue(mockLogger);
+
 // Mock logger - must be before ALL imports to ensure it's hoisted
-vi.mock('../../../logger.js', () => {
-  const mockLogger = {
-    info: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-    warn: vi.fn(),
-    child: vi.fn(),
-  };
-  // Make child return itself for chaining
-  mockLogger.child.mockReturnValue(mockLogger);
-  
-  return {
-    getLogger: () => mockLogger,
-  };
-});
+vi.mock('../../../logger.js', () => ({
+  getLogger: () => mockLogger,
+}));
 
 // Mock the logger without .js extension as well (in case of different import styles)
-vi.mock('../../../logger', () => {
-  const mockLogger = {
-    info: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-    warn: vi.fn(),
-    child: vi.fn(),
-  };
-  // Make child return itself for chaining
-  mockLogger.child.mockReturnValue(mockLogger);
-  
-  return {
-    getLogger: () => mockLogger,
-  };
-});
+vi.mock('../../../logger', () => ({
+  getLogger: () => mockLogger,
+}));
 
 // Mock ExecutionHandler early to prevent errors
 vi.mock('../../../handlers/executionHandler', () => {
