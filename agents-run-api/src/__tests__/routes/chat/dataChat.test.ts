@@ -1,7 +1,7 @@
 import { nanoid } from 'nanoid';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-// Mock logger - must be before imports
+// Mock logger - must be before ALL imports to ensure it's available when modules load
 vi.mock('../../../logger.js', () => {
   const mockLogger = {
     info: vi.fn(),
@@ -35,9 +35,24 @@ vi.mock('../../../logger', () => {
   };
 });
 
+// Mock ExecutionHandler early to prevent errors
+vi.mock('../../../handlers/executionHandler', () => {
+  return {
+    ExecutionHandler: vi.fn().mockImplementation(() => ({
+      execute: vi.fn().mockImplementation(async (args: any) => {
+        // Ensure sseHelper exists and has required methods
+        if (args.sseHelper && typeof args.sseHelper.writeRole === 'function') {
+          await args.sseHelper.writeRole();
+          await args.sseHelper.writeContent('[{"type":"text", "text":"Test response from agent"}]');
+        }
+        return { success: true, iterations: 1 };
+      }),
+    })),
+  };
+});
+
 import { createAgent, createAgentGraph } from '@inkeep/agents-core';
 import dbClient from '../../../data/db/dbClient';
-import * as execModule from '../../../handlers/executionHandler';
 import { ensureTestProject } from '../../utils/testProject';
 import { makeRequest } from '../../utils/testRequest';
 import { createTestTenantId } from '../../utils/testTenant';
@@ -93,21 +108,7 @@ vi.mock('@inkeep/agents-core', async (importOriginal) => {
   };
 });
 
-const STREAM_TEXT = '[{"type":"text", "text":"Test response from agent"}]';
-
-beforeAll(() => {
-  vi.spyOn(execModule.ExecutionHandler.prototype, 'execute').mockImplementation(
-    async (args: any) => {
-      await args.sseHelper.writeRole();
-      await args.sseHelper.writeContent(STREAM_TEXT);
-      return { success: true, iterations: 1 } as any;
-    }
-  );
-});
-
-afterAll(() => {
-  vi.restoreAllMocks();
-});
+// No longer need beforeAll/afterAll since ExecutionHandler is mocked at module level
 
 describe('Chat Data Stream Route', () => {
   it('should stream response using Vercel data stream protocol', async () => {
