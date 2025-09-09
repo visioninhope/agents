@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
-// Hoist the mock function
+// Hoist the mock function - must use vi.hoisted to access in vi.mock
 const { mockParsePartialJson } = vi.hoisted(() => {
-  const fn = vi.fn();
-  return { mockParsePartialJson: fn };
+  return { 
+    mockParsePartialJson: vi.fn()
+  };
 });
 
 // Mock parsePartialJson from 'ai' package
@@ -11,8 +12,6 @@ vi.mock('ai', () => ({
   parsePartialJson: mockParsePartialJson,
   tool: vi.fn((config) => config),
 }));
-
-import { parsePartialJson } from 'ai';
 import {
   createVercelStreamHelper,
   type VercelDataStreamHelper,
