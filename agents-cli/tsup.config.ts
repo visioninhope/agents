@@ -7,7 +7,7 @@ export default defineConfig({
     config: 'src/config.ts',
   },
   format: ['esm'],
-  target: 'node20',
+  target: 'node22',
   dts: process.env.ENVIRONMENT !== 'development',
   bundle: true,
   // Minimal external list - just problematic packages
