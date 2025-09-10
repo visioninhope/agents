@@ -127,7 +127,7 @@ program
   .command('dev')
   .description('Start the Inkeep dashboard server')
   .option('--port <port>', 'Port to run the server on', '3000')
-  .option('--host <host>', 'Host to bind the server to', '127.0.0.1')
+  .option('--host <host>', 'Host to bind the server to', 'localhost')
   .action(async (options) => {
     await devCommand({
       port: parseInt(options.port, 10),

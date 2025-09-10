@@ -80,7 +80,7 @@ function startWebApp({ port = 3000, host = 'localhost' }: DevOptions) {
 }
 
 export async function devCommand(options: DevOptions) {
-  const { port = 3000, host = '127.0.0.1' } = options;
+  const { port = 3000, host = 'localhost' } = options;
 
   console.log(chalk.blue('Inkeep Dashboard Server'));
   console.log(chalk.gray(`Starting server on ${host}:${port}`));
