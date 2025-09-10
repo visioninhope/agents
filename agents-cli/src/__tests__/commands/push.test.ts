@@ -58,7 +58,7 @@ describe('Push Command - Project Validation', () => {
   let mockExit: Mock;
   let mockLog: Mock;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     
     // Ensure tsx-loader is not mocked for these tests
@@ -84,6 +84,35 @@ describe('Push Command - Project Validation', () => {
 
     // Mock file existence check for graph file
     (existsSync as Mock).mockReturnValue(true);
+
+    // Mock configuration validation
+    const { validateConfiguration } = await import('../../utils/config.js');
+    (validateConfiguration as Mock).mockResolvedValue({
+      tenantId: 'test-tenant',
+      projectId: 'test-project',
+      managementApiUrl: 'http://localhost:3002',
+      executionApiUrl: 'http://localhost:3001',
+      manageUiUrl: 'http://localhost:3000',
+      sources: {
+        tenantId: 'config',
+        projectId: 'config',
+        managementApiUrl: 'config',
+        executionApiUrl: 'config',
+      },
+    });
+
+    // Mock ManagementApiClient
+    const { ManagementApiClient } = await import('../../api.js');
+    const mockApi = {
+      pushGraph: vi.fn().mockResolvedValue({
+        id: 'test-graph-id',
+        name: 'Test Graph',
+        agents: [],
+        tools: [],
+        relations: [],
+      }),
+    };
+    (ManagementApiClient.create as Mock).mockResolvedValue(mockApi);
 
     // Default environment
     process.env.DB_FILE_NAME = 'test.db';
@@ -112,9 +141,10 @@ describe('Push Command - Project Validation', () => {
       setConfig: vi.fn(),
     };
 
-    vi.doMock('/test/path/graph.js', () => ({
+    // Mock the tsx-loader to return our graph
+    (importWithTypeScriptSupport as Mock).mockResolvedValue({
       graph: mockGraph,
-    }));
+    });
 
     // Run in TypeScript mode (skip tsx spawn)
     process.env.TSX_RUNNING = '1';
@@ -162,9 +192,10 @@ describe('Push Command - Project Validation', () => {
       setConfig: vi.fn(),
     };
 
-    vi.doMock('/test/path/graph.js', () => ({
+    // Mock the tsx-loader to return our graph
+    (importWithTypeScriptSupport as Mock).mockResolvedValue({
       graph: mockGraph,
-    }));
+    });
 
     process.env.TSX_RUNNING = '1';
 
@@ -212,9 +243,10 @@ describe('Push Command - Project Validation', () => {
       setConfig: vi.fn(),
     };
 
-    vi.doMock('/test/path/graph.js', () => ({
+    // Mock the tsx-loader to return our graph
+    (importWithTypeScriptSupport as Mock).mockResolvedValue({
       graph: mockGraph,
-    }));
+    });
 
     process.env.TSX_RUNNING = '1';
 
@@ -242,6 +274,26 @@ describe('Push Command - Project Validation', () => {
 
     // Mock project creation failure
     mockCreateProject.mockRejectedValue(new Error('Database error'));
+
+    // Mock graph file import
+    const mockGraph = {
+      init: vi.fn().mockResolvedValue(undefined),
+      getId: vi.fn().mockReturnValue('test-graph'),
+      getName: vi.fn().mockReturnValue('Test Graph'),
+      getAgents: vi.fn().mockReturnValue([]),
+      getStats: vi.fn().mockReturnValue({
+        agentCount: 1,
+        toolCount: 0,
+        relationCount: 0,
+      }),
+      getDefaultAgent: vi.fn().mockReturnValue(null),
+      setConfig: vi.fn(),
+    };
+
+    // Mock the tsx-loader to return our graph
+    (importWithTypeScriptSupport as Mock).mockResolvedValue({
+      graph: mockGraph,
+    });
 
     process.env.TSX_RUNNING = '1';
 
@@ -275,9 +327,10 @@ describe('Push Command - Project Validation', () => {
       setConfig: vi.fn(),
     };
 
-    vi.doMock('/test/path/graph.js', () => ({
+    // Mock the tsx-loader to return our graph
+    (importWithTypeScriptSupport as Mock).mockResolvedValue({
       graph: mockGraph,
-    }));
+    });
 
     process.env.TSX_RUNNING = '1';
 
@@ -312,9 +365,10 @@ describe('Push Command - Project Validation', () => {
       setConfig: vi.fn(),
     };
 
-    vi.doMock('/test/path/graph.js', () => ({
+    // Mock the tsx-loader to return our graph
+    (importWithTypeScriptSupport as Mock).mockResolvedValue({
       graph: mockGraph,
-    }));
+    });
 
     process.env.TSX_RUNNING = '1';
 
@@ -349,7 +403,7 @@ describe('Push Command - UI Link Generation', () => {
       selectFrom: vi.fn().mockReturnThis(),
       select: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
-      execute: vi.fn().mockResolvedValue([]),
+      execute: vi.fn().mockResolvedValue([{ id: 'test-project', name: 'Test Project', tenantId: 'test-tenant' }]),
       insertInto: vi.fn().mockReturnThis(),
       values: vi.fn().mockReturnThis(),
       returning: vi.fn().mockReturnThis(),
@@ -359,15 +413,15 @@ describe('Push Command - UI Link Generation', () => {
       set: vi.fn().mockReturnThis(),
     };
 
-    // Mock core functions
-    mockGetProject = vi.fn().mockResolvedValue({ id: 'test-project', name: 'Test Project' });
-    mockCreateProject = vi.fn().mockResolvedValue({ id: 'test-project', name: 'Test Project' });
+    // Mock core functions - ensure project exists to bypass creation prompts
+    mockGetProject = vi.fn().mockResolvedValue({ id: 'test-project', name: 'Test Project', tenantId: 'test-tenant' });
+    mockCreateProject = vi.fn().mockResolvedValue({ id: 'test-project', name: 'Test Project', tenantId: 'test-tenant' });
 
     (core.createDatabaseClient as Mock).mockReturnValue(mockDbClient);
-    (core.getProject as Mock) = mockGetProject;
-    (core.createProject as Mock) = mockCreateProject;
+    (core.getProject as Mock).mockReturnValue(mockGetProject);
+    (core.createProject as Mock).mockReturnValue(mockCreateProject);
 
-    // Mock existsSync to return true
+    // Mock existsSync to return true for all files (graph file and database file)
     (existsSync as Mock).mockReturnValue(true);
 
     // Mock process.exit to throw an error instead of actually exiting
@@ -395,6 +449,9 @@ describe('Push Command - UI Link Generation', () => {
       }),
     };
     (ManagementApiClient.create as Mock).mockResolvedValue(mockApi);
+    
+    // Mock inquirer to prevent prompts
+    (inquirer.prompt as unknown as Mock).mockResolvedValue({ shouldCreate: false });
   });
 
   it('should display UI link with custom manageUiUrl', async () => {
@@ -416,6 +473,9 @@ describe('Push Command - UI Link Generation', () => {
     const mockGraph = {
       id: 'test-graph-id',  // Add graph ID
       init: vi.fn().mockResolvedValue(undefined),
+      getId: vi.fn().mockReturnValue('test-graph-id'),
+      getName: vi.fn().mockReturnValue('Test Graph'),
+      getAgents: vi.fn().mockReturnValue([]),
       getStats: vi.fn().mockReturnValue({
         agentCount: 2,
         toolCount: 1,
@@ -470,6 +530,9 @@ describe('Push Command - UI Link Generation', () => {
     const mockGraph = {
       id: 'test-graph-id',
       init: vi.fn().mockResolvedValue(undefined),
+      getId: vi.fn().mockReturnValue('test-graph-id'),
+      getName: vi.fn().mockReturnValue('Test Graph'),
+      getAgents: vi.fn().mockReturnValue([]),
       getStats: vi.fn().mockReturnValue({
         agentCount: 2,
         toolCount: 1,
@@ -522,6 +585,9 @@ describe('Push Command - UI Link Generation', () => {
     const mockGraph = {
       id: 'test-graph-id',
       init: vi.fn().mockResolvedValue(undefined),
+      getId: vi.fn().mockReturnValue('test-graph-id'),
+      getName: vi.fn().mockReturnValue('Test Graph'),
+      getAgents: vi.fn().mockReturnValue([]),
       getStats: vi.fn().mockReturnValue({
         agentCount: 2,
         toolCount: 1,
@@ -575,6 +641,9 @@ describe('Push Command - UI Link Generation', () => {
     const mockGraph = {
       id: 'test-graph-id',
       init: vi.fn().mockResolvedValue(undefined),
+      getId: vi.fn().mockReturnValue('test-graph-id'),
+      getName: vi.fn().mockReturnValue('Test Graph'),
+      getAgents: vi.fn().mockReturnValue([]),
       getStats: vi.fn().mockReturnValue({
         agentCount: 2,
         toolCount: 1,
