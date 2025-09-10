@@ -24,7 +24,7 @@ function resolveWebRuntime() {
   }
 }
 
-function startWebApp({ port = 3000, host = '127.0.0.1' }: DevOptions) {
+function startWebApp({ port = 3000, host = 'localhost' }: DevOptions) {
   const spinner = ora('Starting dashboard server...').start();
 
   try {
