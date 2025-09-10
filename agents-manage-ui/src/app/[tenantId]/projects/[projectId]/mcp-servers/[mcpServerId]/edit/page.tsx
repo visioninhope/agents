@@ -1,3 +1,4 @@
+import { MCPTransportType } from "@inkeep/agents-core/client-exports";
 import { notFound } from "next/navigation";
 import { BodyTemplate } from "@/components/layout/body-template";
 import { MainContent } from "@/components/layout/main-content";
@@ -47,7 +48,9 @@ async function EditMCPPage({ params }: EditMCPPageProps) {
 					url: mcpTool.config.mcp.server.url,
 				},
 				transport: {
-					type: mcpTool.config.mcp.transport?.type || "streamable_http",
+					type:
+						mcpTool.config.mcp.transport?.type ||
+						MCPTransportType.streamableHttp,
 				},
 				toolsConfig:
 					mcpTool.config.mcp.activeTools === undefined

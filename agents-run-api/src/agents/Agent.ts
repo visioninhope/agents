@@ -12,7 +12,9 @@ import {
   getLedgerArtifacts,
   graphHasArtifactComponents,
   listTaskIdsByContextId,
+  MCPServerType,
   type MCPToolConfig,
+  MCPTransportType,
   McpClient,
   type McpServerConfig,
   type McpTool,
@@ -494,7 +496,9 @@ export class Agent {
       description: tool.name, // Use name as description fallback
       serverUrl: tool.config.mcp.server.url,
       activeTools: tool.config.mcp.activeTools,
-      mcpType: tool.config.mcp.server.url.includes('api.nango.dev') ? 'nango' : 'generic',
+      mcpType: tool.config.mcp.server.url.includes('api.nango.dev')
+        ? MCPServerType.nango
+        : MCPServerType.generic,
       transport: tool.config.mcp.transport,
       headers: tool.headers,
     };
@@ -548,7 +552,7 @@ export class Agent {
     } else {
       // No credentials - build basic config
       serverConfig = {
-        type: tool.config.mcp.transport?.type || 'streamable_http',
+        type: tool.config.mcp.transport?.type || MCPTransportType.streamableHttp,
         url: tool.config.mcp.server.url,
         activeTools: tool.config.mcp.activeTools,
       };
