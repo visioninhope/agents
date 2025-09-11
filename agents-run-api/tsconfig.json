@@ -13,7 +13,8 @@
     "allowSyntheticDefaultImports": true,
     "declaration": true,
     "declarationMap": true,
-    "noEmit": false
+    "noEmit": false,
+    "resolveJsonModule": true
   },
   "include": ["src/**/*", "examples/**/*.graph.ts"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "../sdk/src"]
