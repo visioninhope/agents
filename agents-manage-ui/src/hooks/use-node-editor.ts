@@ -1,5 +1,5 @@
 import { useReactFlow } from "@xyflow/react";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useRef } from "react";
 import { useGraphStore } from "@/features/graph/state/use-graph-store";
 import type { ErrorHelpers } from "./use-graph-errors";
 

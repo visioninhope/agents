@@ -58,7 +58,7 @@
       },
       "correctness": {
         "noUnusedVariables": "warn",
-        "noUnusedImports": "warn",
+        "noUnusedImports": "error",
         "useExhaustiveDependencies": "warn",
         "useJsxKeyInIterable": "warn",
         "useUniqueElementIds": "off",

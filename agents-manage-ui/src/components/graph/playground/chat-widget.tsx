@@ -1,7 +1,6 @@
 "use client";
 import {
 	InkeepEmbeddedChat,
-	type InkeepEmbeddedChatProps,
 } from "@inkeep/cxkit-react-oss";
 import type {
 	ComponentsConfig,
