@@ -71,7 +71,7 @@ This file documents Biome linting rules that have been temporarily disabled to a
 
 ### Correctness
 - `noUnusedVariables`: WARN - Unused variables indicate incomplete refactoring
-- `noUnusedImports`: WARN - Unused imports add unnecessary bundle size
+- ~~`noUnusedImports`~~: **FIXED** ✅ - Now set to ERROR (fixed on Sep 11, 2025)
 
 ### Suspicious  
 - `noDocumentCookie`: WARN - Direct cookie manipulation should use Cookie Store API
@@ -117,7 +117,8 @@ For rules currently set to `"warn"`, change them to `"error"` once the issues ar
 ## Notes
 
 - Total rules disabled: 10
-- Total rules set to warn: 6 (existing) + performance.noImgElement
+- Total rules set to warn: 5 (existing) + performance.noImgElement
+- **Rules fixed**: 1 (`noUnusedImports`)
 - Main affected packages: `agents-manage-ui`, `agents-docs`
 - Estimated effort to fix all issues: 2-3 days
 
