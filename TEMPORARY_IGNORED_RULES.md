@@ -52,10 +52,11 @@ This file documents Biome linting rules that have been temporarily disabled to a
 
 ### Complexity
 
-#### `noUselessFragments` - **OFF**
+#### ~~`noUselessFragments`~~ - **FIXED** ✅
 - **What it does**: Removes unnecessary React fragments
 - **Files affected**: `credentials/views/nango-providers-grid.tsx`
 - **Why re-enable**: Cleaner JSX code without unnecessary wrapper elements
+- **Fixed on**: Sep 11, 2025 - Now set to ERROR (no violations found)
 
 ### Security
 
@@ -116,9 +117,9 @@ For rules currently set to `"warn"`, change them to `"error"` once the issues ar
 
 ## Notes
 
-- Total rules disabled: 10
+- Total rules disabled: 9 (was 10)
 - Total rules set to warn: 5 (existing) + performance.noImgElement
-- **Rules fixed**: 1 (`noUnusedImports`)
+- **Rules fixed**: 2 (`noUnusedImports`, `noUselessFragments`)
 - Main affected packages: `agents-manage-ui`, `agents-docs`
 - Estimated effort to fix all issues: 2-3 days
 
