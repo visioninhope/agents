@@ -54,7 +54,7 @@
       "a11y": {
         "useSemanticElements": "off",
         "useValidAriaRole": "off",
-        "useButtonType": "off"
+        "useButtonType": "error"
       },
       "correctness": {
         "noUnusedVariables": "warn",
