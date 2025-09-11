@@ -3,21 +3,9 @@ name: Claude Code Review
 on:
   pull_request:
     types: [opened, synchronize]
-    # Optional: Only run on specific file changes
-    # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
 
 jobs:
   claude-review:
-    # Optional: Filter by PR author
-    # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
-
     # Only run for Inkeep organization members
     if: github.event.pull_request.author_association == 'OWNER' || github.event.pull_request.author_association == 'MEMBER'
     runs-on: ubuntu-latest
@@ -35,15 +23,13 @@ jobs:
 
       - name: Run Claude Code Review
         id: claude-review
-        uses: anthropics/claude-code-action@beta
+        uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
 
-          # Optional: Specify model (defaults to Claude Sonnet 4, uncomment for Claude Opus 4)
-          model: "claude-opus-4-20250514"
+          claude_args: "--model claude-opus-4-20250514"
           
-          # Direct prompt for automated review (no @claude mention needed)
-          direct_prompt: |
+          prompt: |
             You are a TypeScript Staff Engineer and System Architect responsible for reviewing and providing thoughtful, constructive feedback on Pull Requests.
 
             CONTEXT GATHERING AND INITIAL UNDERSTANDING:
@@ -98,29 +84,4 @@ jobs:
             To summarize, think of yourself as both a sanity and quality checker of the code, but also a system-level architect that cares deeply about ensuring PRs and changes are well thought-out and consider all dimensions of impacts on the full system, patterns that set precedent, maintainability of the code and featureset, as well as how it impacts end-user experiences and interfaces.
 
             Since this is an open source repo, it's especially important to ensure we are thorough and thoughtful end-to-end across all relevant dimensions and focus the final report on what's potentially actionable.
-
-          # Optional: Use sticky comments to make Claude reuse the same comment on subsequent pushes to the same PR
-          # use_sticky_comment: true
-          
-          # Optional: Customize review based on file types
-          # direct_prompt: |
-          #   Review this PR focusing on:
-          #   - For TypeScript files: Type safety and proper interface usage
-          #   - For API endpoints: Security, input validation, and error handling
-          #   - For React components: Performance, accessibility, and best practices
-          #   - For tests: Coverage, edge cases, and test quality
-          
-          # Optional: Different prompts for different authors
-          # direct_prompt: |
-          #   ${{ github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR' && 
-          #   'Welcome! Please review this PR from a first-time contributor. Be encouraging and provide detailed explanations for any suggestions.' ||
-          #   'Please provide a thorough code review focusing on our coding standards and best practices.' }}
-          
-          # Optional: Add specific tools for running tests or linting
-          # allowed_tools: "Bash(npm run test),Bash(npm run lint),Bash(npm run typecheck)"
-          
-          # Optional: Skip review for certain conditions
-          # if: |
-          #   !contains(github.event.pull_request.title, '[skip-review]') &&
-          #   !contains(github.event.pull_request.title, '[WIP]')
 
