@@ -62,10 +62,11 @@ This file documents Biome linting rules that have been temporarily disabled to a
 
 ### Security
 
-#### `noDangerouslySetInnerHtml` - **OFF**
+#### ~~`noDangerouslySetInnerHtml`~~ - **FIXED** ✅
 - **What it does**: Warns against using dangerouslySetInnerHTML
 - **Files affected**: `ui/chart.tsx`
 - **Why re-enable**: Prevents XSS vulnerabilities from injecting untrusted HTML
+- **Fixed on**: Sep 11, 2025 - Now set to ERROR (no violations found)
 
 ## Rules Set to WARN (Should Eventually Be Fixed)
 
@@ -119,11 +120,11 @@ For rules currently set to `"warn"`, change them to `"error"` once the issues ar
 
 ## Notes
 
-- Total rules disabled: 7 (was 10)
+- Total rules disabled: 6 (was 10)
 - Total rules set to warn: 5 (existing) + performance.noImgElement
-- **Rules fixed**: 4 (`noUnusedImports`, `noUselessFragments`, `useButtonType`, `noAssignInExpressions`)
+- **Rules fixed**: 5 (`noUnusedImports`, `noUselessFragments`, `useButtonType`, `noAssignInExpressions`, `noDangerouslySetInnerHtml`)
 - Main affected packages: `agents-manage-ui`, `agents-docs`
-- Estimated effort to fix all issues: 2-3 days
+- Estimated effort to fix all issues: 1-2 days
 
 ---
 
