@@ -66,7 +66,7 @@
         "noUnusedFunctionParameters": "off"
       },
       "security": {
-        "noDangerouslySetInnerHtml": "off"
+        "noDangerouslySetInnerHtml": "error"
       }
     }
   },
