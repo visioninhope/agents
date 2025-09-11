@@ -12,7 +12,7 @@
     "sync:licenses": "node scripts/sync-licenses.mjs",
     "prebuild": "pnpm install --frozen-lockfile && pnpm sync:licenses",
     "build": "turbo build",
-    "dev": "turbo dev",
+    "dev": "turbo dev --filter='!@inkeep/create-agents'",
     "prepack": "turbo prepack",
     "dev:apis": "turbo dev:apis",
     "pretest": "pnpm install --frozen-lockfile",
