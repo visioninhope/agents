@@ -35,7 +35,7 @@
       "suspicious": {
         "noExplicitAny": "off",
         "noArrayIndexKey": "off",
-        "useIterableCallbackReturn": "off",
+        "useIterableCallbackReturn": "error",
         "noDocumentCookie": "warn",
         "noAssignInExpressions": "error"
       },
@@ -52,8 +52,8 @@
         "noImgElement": "warn"
       },
       "a11y": {
-        "useSemanticElements": "off",
-        "useValidAriaRole": "off",
+        "useSemanticElements": "error",
+        "useValidAriaRole": "error",
         "useButtonType": "error"
       },
       "correctness": {
@@ -61,9 +61,9 @@
         "noUnusedImports": "error",
         "useExhaustiveDependencies": "warn",
         "useJsxKeyInIterable": "warn",
-        "useUniqueElementIds": "off",
-        "noNestedComponentDefinitions": "off",
-        "noUnusedFunctionParameters": "off"
+        "useUniqueElementIds": "error",
+        "noNestedComponentDefinitions": "error",
+        "noUnusedFunctionParameters": "error"
       },
       "security": {
         "noDangerouslySetInnerHtml": "error"
