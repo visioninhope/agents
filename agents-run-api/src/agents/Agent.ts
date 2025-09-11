@@ -24,7 +24,15 @@ import {
   TemplateEngine,
 } from '@inkeep/agents-core';
 import { type Span, SpanStatusCode, trace } from '@opentelemetry/api';
-import { generateObject, generateText, streamText, type ToolSet, tool, type StreamTextResult, type Tool } from 'ai';
+import {
+  generateObject,
+  generateText,
+  streamText,
+  type ToolSet,
+  tool,
+  type StreamTextResult,
+  type Tool,
+} from 'ai';
 import { z } from 'zod';
 import {
   createDefaultConversationHistoryConfig,
@@ -73,17 +81,19 @@ const tracer = getGlobalTracer();
 // Constants for agent configuration
 const CONSTANTS = {
   MAX_GENERATION_STEPS: 12,
-  DEFAULT_PRIMARY_MODEL: 'anthropic/claude-4-sonnet-20250514',
-  DEFAULT_STRUCTURED_OUTPUT_MODEL: 'openai/gpt-4.1-mini-2025-04-14',
-  DEFAULT_SUMMARIZER_MODEL: 'openai/gpt-4.1-nano-2025-04-14',
   PHASE_1_TIMEOUT_MS: 270_000, // 4.5 minutes for streaming phase 1
   NON_STREAMING_PHASE_1_TIMEOUT_MS: 90_000, // 1.5 minutes for non-streaming phase 1
   PHASE_2_TIMEOUT_MS: 90_000, // 1.5 minutes for phase 2 structured output
 } as const;
 
-// Helper function to handle empty model strings
-function getModelOrDefault(modelString: string | undefined, defaultModel: string): string {
-  return modelString?.trim() || defaultModel;
+// Helper function to validate model strings
+function validateModel(modelString: string | undefined, modelType: string): string {
+  if (!modelString?.trim()) {
+    throw new Error(
+      `${modelType} model is required. Please configure models at the project level.`
+    );
+  }
+  return modelString.trim();
 }
 
 export type AgentConfig = {
@@ -133,7 +143,9 @@ export type DelegateRelation =
 export type ToolType = 'transfer' | 'delegation' | 'mcp' | 'tool';
 
 // Type guard to validate MCP tools have the expected AI SDK structure
-function isValidTool(tool: any): tool is Tool<any, any> & { execute: (args: any, context?: any) => Promise<any> } {
+function isValidTool(
+  tool: any
+): tool is Tool<any, any> & { execute: (args: any, context?: any) => Promise<any> } {
   return (
     tool &&
     typeof tool === 'object' &&
@@ -211,25 +223,29 @@ export class Agent {
 
   /**
    * Get the primary model settings for text generation and thinking
-   * Defaults to claude-4-sonnet if not specified
+   * Requires model to be configured at project level
    */
   private getPrimaryModel(): ModelSettings {
     if (!this.config.models?.base) {
-      return { model: CONSTANTS.DEFAULT_PRIMARY_MODEL };
+      throw new Error(
+        'Base model configuration is required. Please configure models at the project level.'
+      );
     }
     return {
-      model: getModelOrDefault(this.config.models.base.model, CONSTANTS.DEFAULT_PRIMARY_MODEL),
+      model: validateModel(this.config.models.base.model, 'Base'),
       providerOptions: this.config.models.base.providerOptions,
     };
   }
 
   /**
    * Get the model settings for structured output generation
-   * Defaults to GPT-4.1-mini for structured outputs if not specified
+   * Falls back to base model if structured output not configured
    */
   private getStructuredOutputModel(): ModelSettings {
     if (!this.config.models) {
-      return { model: CONSTANTS.DEFAULT_STRUCTURED_OUTPUT_MODEL };
+      throw new Error(
+        'Model configuration is required. Please configure models at the project level.'
+      );
     }
 
     // Use structured output config if available, otherwise fall back to base
@@ -239,15 +255,20 @@ export class Agent {
     // If structured output is explicitly configured, use only its config
     if (structuredConfig) {
       return {
-        model: getModelOrDefault(structuredConfig.model, CONSTANTS.DEFAULT_STRUCTURED_OUTPUT_MODEL),
+        model: validateModel(structuredConfig.model, 'Structured output'),
         providerOptions: structuredConfig.providerOptions,
       };
     }
 
     // Fall back to base model settings if structured output not configured
+    if (!baseConfig) {
+      throw new Error(
+        'Base model configuration is required for structured output fallback. Please configure models at the project level.'
+      );
+    }
     return {
-      model: getModelOrDefault(baseConfig?.model, CONSTANTS.DEFAULT_STRUCTURED_OUTPUT_MODEL),
-      providerOptions: baseConfig?.providerOptions,
+      model: validateModel(baseConfig.model, 'Base (fallback for structured output)'),
+      providerOptions: baseConfig.providerOptions,
     };
   }
 
@@ -456,16 +477,16 @@ export class Agent {
               // Call the original MCP tool with proper error handling
               const result = await originalTool.execute(args, { toolCallId });
 
-            // Record the result immediately in the session manager
-            toolSessionManager.recordToolResult(sessionId, {
-              toolCallId,
-              toolName,
-              args,
-              result,
-              timestamp: Date.now(),
-            });
+              // Record the result immediately in the session manager
+              toolSessionManager.recordToolResult(sessionId, {
+                toolCallId,
+                toolName,
+                args,
+                result,
+                timestamp: Date.now(),
+              });
 
-            return { result, toolCallId };
+              return { result, toolCallId };
             } catch (error) {
               logger.error({ toolName, toolCallId, error }, 'MCP tool execution failed');
               throw error;
@@ -1128,13 +1149,19 @@ Key requirements:
 
         // Ensure timeout doesn't exceed maximum
         const timeoutMs = Math.min(configuredTimeout, MAX_ALLOWED_TIMEOUT_MS);
-        
-        if (modelSettings.maxDuration && modelSettings.maxDuration * 1000 > MAX_ALLOWED_TIMEOUT_MS) {
-          logger.warn({
-            requestedTimeout: modelSettings.maxDuration * 1000,
-            appliedTimeout: timeoutMs,
-            maxAllowed: MAX_ALLOWED_TIMEOUT_MS
-          }, 'Requested timeout exceeded maximum allowed, capping to 10 minutes');
+
+        if (
+          modelSettings.maxDuration &&
+          modelSettings.maxDuration * 1000 > MAX_ALLOWED_TIMEOUT_MS
+        ) {
+          logger.warn(
+            {
+              requestedTimeout: modelSettings.maxDuration * 1000,
+              appliedTimeout: timeoutMs,
+              maxAllowed: MAX_ALLOWED_TIMEOUT_MS,
+            },
+            'Requested timeout exceeded maximum allowed, capping to 10 minutes'
+          );
         }
 
         // Build messages for Phase 1 - use thinking prompt if structured output needed
@@ -1357,8 +1384,7 @@ Key requirements:
     **Task ID:** ${taskId}
 
     ### Summary
-    ${typeof summaryData === 'string' ? summaryData : JSON.stringify(summaryData, null, 2)}
-    `;
+    ${typeof summaryData === 'string' ? summaryData : JSON.stringify(summaryData, null, 2)}`;
 
                             reasoningFlow.push({
                               role: 'assistant',

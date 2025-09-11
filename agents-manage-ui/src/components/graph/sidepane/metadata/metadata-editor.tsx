@@ -213,7 +213,11 @@ function MetadataEditor() {
 						<div className="relative">
 							<ModelSelector
 								value={models?.structuredOutput?.model || ""}
-								inheritedValue={project?.models?.structuredOutput?.model}
+								inheritedValue={
+									project?.models?.structuredOutput?.model ||
+									models?.base?.model ||
+									project?.models?.base?.model
+								}
 								onValueChange={(value) => {
 									const newModels = {
 										...(models || {}),
@@ -245,7 +249,11 @@ function MetadataEditor() {
 						<div className="relative">
 							<ModelSelector
 								value={models?.summarizer?.model || ""}
-								inheritedValue={project?.models?.summarizer?.model}
+								inheritedValue={
+									project?.models?.summarizer?.model ||
+									models?.base?.model ||
+									project?.models?.base?.model
+								}
 								onValueChange={(value) => {
 									const newModels = {
 										...(models || {}),
