@@ -39,8 +39,8 @@ async function makeApiRequestInternal<T>(
 	const defaultHeaders = {
 		"Content-Type": "application/json",
 		...options.headers,
-		...(process.env.INKEEP_AGENTS_MANAGE_API_SECRET && {
-			Authorization: `Bearer ${process.env.INKEEP_AGENTS_MANAGE_API_SECRET}`,
+		...(process.env.INKEEP_AGENTS_MANAGE_API_BYPASS_SECRET && {
+			Authorization: `Bearer ${process.env.INKEEP_AGENTS_MANAGE_API_BYPASS_SECRET}`,
 		}),
 	};
 
