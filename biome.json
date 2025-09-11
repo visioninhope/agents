@@ -37,7 +37,7 @@
         "noArrayIndexKey": "off",
         "useIterableCallbackReturn": "off",
         "noDocumentCookie": "warn",
-        "noAssignInExpressions": "off"
+        "noAssignInExpressions": "error"
       },
       "complexity": {
         "noStaticOnlyClass": "off",

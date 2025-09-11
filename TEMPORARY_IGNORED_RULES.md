@@ -46,10 +46,11 @@ This file documents Biome linting rules that have been temporarily disabled to a
 - **Files affected**: `sidebar/list.tsx`, `sidebar/folder.tsx`, `sidebar/transform.ts`
 - **Why re-enable**: Prevents subtle bugs where map operations don't return expected values
 
-#### `noAssignInExpressions` - **OFF**
+#### ~~`noAssignInExpressions`~~ - **FIXED** ✅
 - **What it does**: Prevents assignments within expressions (e.g., in return statements)
 - **Files affected**: `lib/api/signoz-stats.ts`
 - **Why re-enable**: Makes code more readable and prevents accidental assignments
+- **Fixed on**: Sep 11, 2025 - Now set to ERROR (no violations found)
 
 ### Complexity
 
@@ -118,9 +119,9 @@ For rules currently set to `"warn"`, change them to `"error"` once the issues ar
 
 ## Notes
 
-- Total rules disabled: 8 (was 10)
+- Total rules disabled: 7 (was 10)
 - Total rules set to warn: 5 (existing) + performance.noImgElement
-- **Rules fixed**: 3 (`noUnusedImports`, `noUselessFragments`, `useButtonType`)
+- **Rules fixed**: 4 (`noUnusedImports`, `noUselessFragments`, `useButtonType`, `noAssignInExpressions`)
 - Main affected packages: `agents-manage-ui`, `agents-docs`
 - Estimated effort to fix all issues: 2-3 days
 
