@@ -7,8 +7,10 @@ on:
 jobs:
   claude-review:
     # Only run for Inkeep organization members
-    if: github.event.pull_request.author_association == 'OWNER' || github.event.pull_request.author_association == 'MEMBER'
+    # if: github.event.pull_request.author_association == 'OWNER' || github.event.pull_request.author_association == 'MEMBER'
+    
     runs-on: ubuntu-latest
+    
     permissions:
       contents: read
       pull-requests: read
