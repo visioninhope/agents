@@ -37,6 +37,7 @@ The project is a monorepo with the following packages:
 *   `examples`: Example agent graphs.
 *   `packages/agents-core`: Core functionality of the agent framework.
 *   `packages/agents-sdk`: The TypeScript SDK for building agents.
+*   `packages/create-agents`: A CLI to create new agent projects.
 
 ## Building and Running
 
