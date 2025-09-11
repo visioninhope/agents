@@ -42,7 +42,7 @@
       "complexity": {
         "noStaticOnlyClass": "off",
         "noBannedTypes": "warn",
-        "noUselessFragments": "off"
+        "noUselessFragments": "error"
       },
       "style": {
         "noUnusedTemplateLiteral": "off",
