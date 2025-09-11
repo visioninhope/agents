@@ -48,7 +48,7 @@ import { getLogger } from '../logger';
 getLogger('Test Setup').debug({}, 'Setting up instrumentation');
 
 const sdk = new NodeSDK({
-  serviceName: 'inkeep-execution-api',
+  serviceName: 'inkeep-agents-run-api-test',
   spanProcessors: [
     new SimpleSpanProcessor(
       new OTLPTraceExporter({
