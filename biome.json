@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.1.4/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.2.4/schema.json",
   "assist": {
     "actions": {
       "source": {
@@ -26,17 +26,23 @@
       "!**/drizzle.config.*",
       "!**/.next/**",
       "!**/build/**",
-      "!**/out/**"
+      "!**/out/**",
+      "!**/*.css",
+      "!**/.source/**"
     ],
     "rules": {
       "recommended": true,
       "suspicious": {
         "noExplicitAny": "off",
-        "noArrayIndexKey": "off"
+        "noArrayIndexKey": "off",
+        "useIterableCallbackReturn": "error",
+        "noDocumentCookie": "warn",
+        "noAssignInExpressions": "error"
       },
       "complexity": {
         "noStaticOnlyClass": "off",
-        "noBannedTypes": "warn"
+        "noBannedTypes": "warn",
+        "noUselessFragments": "error"
       },
       "style": {
         "noUnusedTemplateLiteral": "off",
@@ -46,13 +52,21 @@
         "noImgElement": "warn"
       },
       "a11y": {
-        "useSemanticElements": "warn"
+        "useSemanticElements": "error",
+        "useValidAriaRole": "error",
+        "useButtonType": "error"
       },
       "correctness": {
         "noUnusedVariables": "warn",
-        "noUnusedImports": "warn",
+        "noUnusedImports": "error",
         "useExhaustiveDependencies": "warn",
-        "useJsxKeyInIterable": "warn"
+        "useJsxKeyInIterable": "warn",
+        "useUniqueElementIds": "error",
+        "noNestedComponentDefinitions": "error",
+        "noUnusedFunctionParameters": "error"
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": "error"
       }
     }
   },

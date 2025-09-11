@@ -14,7 +14,8 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsc",
-    "lint": "biome check .",
+    "lint": "biome lint .",
+    "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "test": "vitest --run --passWithNoTests",
     "test:watch": "vitest",
@@ -40,7 +41,6 @@
     "commander": "^12.0.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.8.0",
     "@types/node": "^20.12.0",
     "tsx": "^4.7.0",
     "typescript": "^5.4.0",

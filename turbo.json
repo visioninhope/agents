@@ -101,6 +101,11 @@
       "inputs": ["$TURBO_DEFAULT$"],
       "outputs": []
     },
+    "lint:fix": {
+      "inputs": ["$TURBO_DEFAULT$"],
+      "outputs": [],
+      "cache": false
+    },
     "typecheck": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$"],
@@ -137,6 +142,10 @@
     "docs#dev": {
       "cache": false,
       "persistent": true
+    },
+    "check": {
+      "dependsOn": ["build", "lint", "typecheck", "test"],
+      "cache": false
     }
   }
 }
