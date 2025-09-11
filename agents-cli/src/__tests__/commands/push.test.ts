@@ -230,9 +230,6 @@ describe('Push Command - Project Validation', () => {
         base: {
           model: 'anthropic/claude-sonnet-4-20250514',
         },
-        pull: {
-          model: 'anthropic/claude-sonnet-4-20250514',
-        },
       },
     });
   });

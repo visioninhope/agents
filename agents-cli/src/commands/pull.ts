@@ -194,18 +194,6 @@ export async function pullCommand(graphId: string, options: PullOptions) {
       console.log(chalk.gray(`  • View the file: ${outputFilePath}`));
       console.log(chalk.gray(`  • Use the data in your application`));
     } else {
-      // Generate TypeScript file using LLM
-      if (!config.modelSettings?.pull) {
-        spinner.fail('Pull model configuration is required for TypeScript generation');
-        console.error(chalk.red('Error: No pull model found in configuration.'));
-        console.error(chalk.yellow('Please add pull model to your inkeep.config.ts file.'));
-        console.error(chalk.gray('Example:'));
-        console.error(chalk.gray('  modelSettings: {'));
-        console.error(chalk.gray('    base: { model: "anthropic/claude-sonnet-4-20250514" },'));
-        console.error(chalk.gray('    pull: { model: "anthropic/claude-sonnet-4-20250514" },'));
-        console.error(chalk.gray('  }'));
-        process.exit(1);
-      }
 
       // Generate TypeScript file with validation and retry logic
       const maxRetries = options.maxRetries || 3;
@@ -225,11 +213,14 @@ export async function pullCommand(graphId: string, options: PullOptions) {
             : 'Generating TypeScript file with LLM...';
         }
 
+        // TODO: configure this based on environment variable?
+        const pullModel = config.modelSettings?.base || { model: 'anthropic/claude-sonnet-4-20250514' };
+
         await generateTypeScriptFileWithLLM(
           graphData,
           graphId,
           outputFilePath,
-          config.modelSettings.pull,
+          pullModel,
           {
             attempt,
             maxRetries,

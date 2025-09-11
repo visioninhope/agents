@@ -386,7 +386,7 @@ describe('create command', () => {
       });
 
       expect(mockExecAsync).toHaveBeenCalledWith('pnpm install');
-      expect(mockExecAsync).toHaveBeenCalledWith('pnpm exec drizzle-kit push');
+      expect(mockExecAsync).toHaveBeenCalledWith('pnpm db:push');
     });
 
     it('should handle installation errors gracefully', async () => {

@@ -62,7 +62,6 @@ export const ProjectModelSchema = z.object({
   base: ModelSettingsSchema,
   structuredOutput: ModelSettingsSchema.optional(),
   summarizer: ModelSettingsSchema.optional(),
-  pull: ModelSettingsSchema,
 });
 
 // Helper functions with better type preservation

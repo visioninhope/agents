@@ -11,18 +11,12 @@ export interface ModelConfigurationResult {
     summarizer?: {
       model: string;
     };
-    pull: {
-      model: string;
-    };
   };
 }
 
 export const defaultDualModelConfigurations = {
   base: {
     model: 'anthropic/claude-sonnet-4-20250514',
-  },
-  pull: {
-    model: 'openai/gpt-5-2025-08-07',
   },
   structuredOutput: {
     model: 'openai/gpt-4.1-mini-2025-04-14',
@@ -36,9 +30,6 @@ export const defaultOpenaiModelConfigurations = {
   base: {
     model: 'openai/gpt-5-2025-08-07',
   },
-  pull: {
-    model: 'openai/gpt-5-2025-08-07',
-  },
   structuredOutput: {
     model: 'openai/gpt-4.1-mini-2025-04-14',
   },
@@ -50,9 +41,6 @@ export const defaultOpenaiModelConfigurations = {
 export const defaultAnthropicModelConfigurations = {
   base: {
     model: 'anthropic/claude-sonnet-4-20250514',
-  },
-  pull: {
-    model: 'anthropic/claude-opus-4-1-20250805',
   },
   structuredOutput: {
     model: 'anthropic/claude-sonnet-4-20250514',
@@ -120,12 +108,6 @@ export async function promptForModelConfiguration(): Promise<ModelConfigurationR
       choices: availableModels,
     },
     {
-      type: 'list',
-      name: 'pullModel',
-      message: 'Select your model for TypeScript code generation (inkeep pull command, required):',
-      choices: availableModels,
-    },
-    {
       type: 'confirm',
       name: 'configureOptionalModels',
       message: 'Would you like to configure optional models for structured output and summaries?',
@@ -157,9 +139,6 @@ export async function promptForModelConfiguration(): Promise<ModelConfigurationR
   const modelSettings: any = {
     base: {
       model: modelAnswers.baseModel,
-    },
-    pull: {
-      model: modelAnswers.pullModel,
     },
   };
 
