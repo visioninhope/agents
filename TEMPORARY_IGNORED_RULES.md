@@ -16,10 +16,11 @@ This file documents Biome linting rules that have been temporarily disabled to a
 - **Files affected**: Various UI components with `role="button"` on non-button elements
 - **Why re-enable**: Ensures proper accessibility compliance
 
-#### `useButtonType` - **OFF**
+#### ~~`useButtonType`~~ - **FIXED** ✅
 - **What it does**: Requires explicit `type` attribute on button elements
 - **Files affected**: `agents-manage-ui/src/components/graph/playground/ikp-message.tsx`
 - **Why re-enable**: Prevents unintended form submissions when buttons are inside forms
+- **Fixed on**: Sep 11, 2025 - Now set to ERROR (no violations found)
 
 ### Correctness
 
@@ -117,9 +118,9 @@ For rules currently set to `"warn"`, change them to `"error"` once the issues ar
 
 ## Notes
 
-- Total rules disabled: 9 (was 10)
+- Total rules disabled: 8 (was 10)
 - Total rules set to warn: 5 (existing) + performance.noImgElement
-- **Rules fixed**: 2 (`noUnusedImports`, `noUselessFragments`)
+- **Rules fixed**: 3 (`noUnusedImports`, `noUselessFragments`, `useButtonType`)
 - Main affected packages: `agents-manage-ui`, `agents-docs`
 - Estimated effort to fix all issues: 2-3 days
 
