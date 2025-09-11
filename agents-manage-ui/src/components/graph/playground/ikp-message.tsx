@@ -57,7 +57,7 @@ const CitationBadge: FC<{
   );
 };
 
-const getOperationLabel = (operation: any) => {
+const getOperationLabel = (operation: DataOperation) => {
   const { type } = operation;
   // Use LLM-generated label if available (for status updates and other operations)
   if (operation.label) {
@@ -86,7 +86,7 @@ const formatElapsedTime = (ms: number) => {
 
 // Grouped Data Operations Component
 const GroupedDataOperations: FC<{
-  operations: any[];
+  operations: DataOperation[];
   isCompleted: boolean;
   startTime: number;
   hasCompletion?: boolean;
@@ -213,10 +213,16 @@ const LoadingDots: FC = () => {
 };
 
 // Types for the stream processing logic
+interface DataOperation {
+  type: string;
+  label?: string;
+  ctx?: any;
+}
+
 interface ProcessedPart {
   type: 'text' | 'operation-group';
   content?: string;
-  operations?: any[];
+  operations?: DataOperation[];
   groupKey?: string;
   hasCompletion?: boolean;
 }
@@ -246,7 +252,7 @@ function useStreamProcessor(parts: any[], isStreaming?: boolean): UseStreamProce
   useEffect(() => {
     const processed: ProcessedPart[] = [];
     let currentTextChunk = '';
-    let currentOperationGroup: any[] = [];
+    let currentOperationGroup: DataOperation[] = [];
     let groupStartTime = Date.now();
 
     // Create a new timings map based on current parts
