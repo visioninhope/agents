@@ -9,7 +9,8 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE.md"
+    "LICENSE.md",
+    "SUPPLEMENTAL_TERMS.md"
   ],
   "scripts": {
     "dev": "tsx src/index.ts",

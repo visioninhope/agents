@@ -74,7 +74,8 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE.md"
+    "LICENSE.md",
+    "SUPPLEMENTAL_TERMS.md"
   ],
   "repository": {
     "type": "git",

@@ -16,8 +16,13 @@
     "LOG_LEVEL"
   ],
   "tasks": {
+    "sync:licenses": {
+      "cache": false,
+      "inputs": ["LICENSE.md", "SUPPLEMENTAL_TERMS.md", "scripts/sync-licenses.mjs"],
+      "outputs": ["packages/*/LICENSE.md", "packages/*/SUPPLEMENTAL_TERMS.md", "agents-*/LICENSE.md", "agents-*/SUPPLEMENTAL_TERMS.md"]
+    },
     "build": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "sync:licenses"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["dist/**", "build/**", ".next/**", "!.next/cache/**"]
     },
