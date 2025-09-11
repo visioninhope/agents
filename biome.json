@@ -50,7 +50,8 @@
         "useImportType": "error"
       },
       "performance": {
-        "noImgElement": "warn"
+        "noImgElement": "warn",
+        "noDynamicNamespaceImportAccess": "off"
       },
       "a11y": {
         "useSemanticElements": "error",

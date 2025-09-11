@@ -1,6 +1,7 @@
 ---
 title: Spans and Traces
 description: OpenTelemetry spans for distributed tracing and observability in the Inkeep Agent Framework
+icon: "LuBug"
 ---
 
 ## Overview
@@ -12,35 +13,39 @@ The Inkeep Agent Framework uses OpenTelemetry for distributed tracing and observ
 ### 1. Import Required Dependencies
 
 ```typescript
-import { SpanStatusCode, type Span } from '@opentelemetry/api';
-import { getTracer, setSpanWithError } from '../tracer';
+import { SpanStatusCode, type Span } from "@opentelemetry/api";
+import { getTracer, setSpanWithError } from "../tracer";
 ```
 
 ### 2. Get the Tracer
 
 ```typescript
 // Use the centralized tracer utility
-const tracer = getTracer('your-service-name');
+const tracer = getTracer("your-service-name");
 ```
 
 ## Creating and Using Spans
 
 ```typescript
-return tracer.startActiveSpan('context.resolve', {
-  attributes: {
-    'context.config_id': contextConfig.id,
-    'context.trigger_event': options.triggerEvent,
+return tracer.startActiveSpan(
+  "context.resolve",
+  {
+    attributes: {
+      "context.config_id": contextConfig.id,
+      "context.trigger_event": options.triggerEvent,
+    },
   },
-}, async (span: Span) => {
-  try {
-    // Your operation logic here
-    return result;
-  } catch (error) {
-    // Use setSpanWithError for consistent error handling
-    setSpanWithError(span, error);
-    throw error;
-  } 
-});
+  async (span: Span) => {
+    try {
+      // Your operation logic here
+      return result;
+    } catch (error) {
+      // Use setSpanWithError for consistent error handling
+      setSpanWithError(span, error);
+      throw error;
+    }
+  }
+);
 ```
 
 ## Setting Span Attributes
@@ -49,8 +54,8 @@ return tracer.startActiveSpan('context.resolve', {
 
 ```typescript
 span.setAttributes({
-  'user.id': userId,
-  'request.method': 'POST',
+  "user.id": userId,
+  "request.method": "POST",
 });
 ```
 
@@ -60,7 +65,7 @@ span.setAttributes({
 
 ```typescript
 // Add events for significant operations
-span.addEvent('context.fetch_started', {
+span.addEvent("context.fetch_started", {
   definitionId: definition.id,
   url: definition.fetchConfig.url,
 });
@@ -69,9 +74,9 @@ span.addEvent('context.fetch_started', {
 ### Error Events
 
 ```typescript
-span.addEvent('error.validation_failed', {
+span.addEvent("error.validation_failed", {
   definitionId: definition.id,
-  error_type: 'json_schema_validation',
+  error_type: "json_schema_validation",
   error_details: errorMessage,
 });
 ```
@@ -96,21 +101,20 @@ try {
 
 ### 1. Consistent Naming Convention
 
-The span naming convention follows a hierarchical structure that mirrors your code organization. 
+The span naming convention follows a hierarchical structure that mirrors your code organization.
 
 ```typescript
 // Format: 'class.function'
 // Use descriptive span names that follow a hierarchical structure
 
 // Agent operations
-'agent.generate'
-'agent.tool_execute'
-'agent.transfer'
+"agent.generate";
+"agent.tool_execute";
+"agent.transfer";
 
 // Context operations
-'context.resolve'
-'context.fetch'
-
+"context.resolve";
+"context.fetch";
 ```
 
 #### Naming Rules
@@ -118,8 +122,7 @@ The span naming convention follows a hierarchical structure that mirrors your co
 1. **Class First**: Start with the class/module name (e.g., `agent`, `context`, `tool`)
 2. **Function Second**: Follow with the specific function/method (e.g., `generate`, `resolve`)
 3. **Use Underscores**: For multi-word functions, use underscores (e.g., `tool_execute`, `cache_lookup`)
-5. **Consistent Casing**: Use lowercase with underscores for consistency
-
+4. **Consistent Casing**: Use lowercase with underscores for consistency
 
 ## Configuration and Setup
 
@@ -134,24 +137,29 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
 
 The framework automatically sets up OpenTelemetry instrumentation in `src/instrumentation.ts`:
 
-
 ## Examples in the Codebase
 
 ### Agent Operations
+
 See `src/agents/Agent.ts` for span usage in agent generation and tool execution.
 
 **Example from Agent.ts:**
+
 ```typescript
 // Class: Agent
 // Function: generate
-return tracer.startActiveSpan('agent.generate', {
-  attributes: {
-    'agent.id': this.id,
-    'agent.name': this.name,
+return tracer.startActiveSpan(
+  "agent.generate",
+  {
+    attributes: {
+      "agent.id": this.id,
+      "agent.name": this.name,
+    },
   },
-}, async (span: Span) => {
-  // ... implementation
-});
+  async (span: Span) => {
+    // ... implementation
+  }
+);
 ```
 
 ## Summary
