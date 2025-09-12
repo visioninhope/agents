@@ -51,6 +51,7 @@ const envSchema = z.object({
   INKEEP_AGENTS_RUN_API_BYPASS_SECRET: z.string().optional(),
   OTEL_MAX_EXPORT_BATCH_SIZE: z.coerce.number().optional(),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional().default('http://localhost:14318/v1/traces'),
+  INKEEP_TRACE_BAGGAGE_TAG_KEYS: z.string().optional().default('conversation.id,project.id,graph.id,tenant.id'),
 });
 
 const parseEnv = () => {
