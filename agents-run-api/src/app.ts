@@ -13,6 +13,7 @@ import { requestId } from 'hono/request-id';
 import type { StatusCode } from 'hono/utils/http-status';
 import { pinoLogger } from 'hono-pino';
 import { pino } from 'pino';
+import { batchProcessor } from './instrumentation';
 import { getLogger } from './logger';
 import { apiKeyAuth } from './middleware/api-key-auth';
 import { setupOpenAPIRoutes } from './openapi';
@@ -259,6 +260,23 @@ function createExecutionHono(
 
   // Setup OpenAPI documentation endpoints (/openapi.json and /docs)
   setupOpenAPIRoutes(app);
+
+  app.use('/tenants/*', async (c, next) => {
+    await next();
+    await batchProcessor.forceFlush();
+  });
+  app.use('/agents/*', async (c, next) => {
+    await next();
+    await batchProcessor.forceFlush();
+  });
+  app.use('/v1/*', async (c, next) => {
+    await next();
+    await batchProcessor.forceFlush();
+  });
+  app.use('/api/*', async (c, next) => {
+    await next();
+    await batchProcessor.forceFlush();
+  });
 
   const baseApp = new Hono();
   baseApp.route('/', app);
