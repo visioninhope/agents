@@ -1,16 +1,22 @@
-import { defineConfig } from '@inkeep/agents-cli/config';
+import { defineConfig } from '@inkeep/agents-cli';
 
 export default defineConfig({
   tenantId: 'inkeep',
-  projectId: 'default',
+  projectId: 'shagun',
   agentsManageApiUrl: 'http://localhost:3002',
   agentsRunApiUrl: 'http://localhost:3003',
   modelSettings: {
     base: {
       model: 'anthropic/claude-sonnet-4-20250514',
-      providerOptions: {
-        // API key should be set via ANTHROPIC_API_KEY environment variable
-      },
+    },
+    pull: {
+      model: 'anthropic/claude-sonnet-4-20250514',
+    },
+    structuredOutput: {
+      model: 'anthropic/claude-sonnet-4-20250514',
+    },
+    summarizer: {
+      model: 'anthropic/claude-sonnet-4-20250514',
     },
   },
 });

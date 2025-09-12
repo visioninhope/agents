@@ -1,13 +1,14 @@
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
-import { BaggageSpanProcessor } from '@opentelemetry/baggage-span-processor';
-import { W3CBaggagePropagator, W3CTraceContextPropagator, CompositePropagator } from '@opentelemetry/core';
+import {
+  ALLOW_ALL_BAGGAGE_KEYS,
+  BaggageSpanProcessor,
+} from '@opentelemetry/baggage-span-processor';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-node';
 import { env } from './env';
 
-const otlpUrl = env.OTEL_EXPORTER_OTLP_ENDPOINT;
-const otlpExporter = new OTLPTraceExporter({ url: otlpUrl });
+const otlpExporter = new OTLPTraceExporter()
 
 // Minimal fan-out so NodeSDK can accept ONE spanProcessor
 class FanOutSpanProcessor {
@@ -29,19 +30,8 @@ class FanOutSpanProcessor {
 const maxExportBatchSize =
   env.OTEL_MAX_EXPORT_BATCH_SIZE ?? (env.ENVIRONMENT === 'development' ? 1 : 512);
 
-// Parse baggage keys from environment variable
-const baggageTagKeys = env.INKEEP_TRACE_BAGGAGE_TAG_KEYS
-  .split(',')
-  .map(key => key.trim())
-  .filter(key => key.length > 0);
-
-// Create a baggage key predicate function
-const baggageKeyPredicate = (baggageKey: string): boolean => {
-  return baggageTagKeys.includes(baggageKey);
-};
-
 const spanProcessor = new FanOutSpanProcessor([
-  new BaggageSpanProcessor(baggageKeyPredicate),
+  new BaggageSpanProcessor(ALLOW_ALL_BAGGAGE_KEYS),
   new BatchSpanProcessor(otlpExporter, {
     maxExportBatchSize,
   }),
@@ -50,12 +40,6 @@ const spanProcessor = new FanOutSpanProcessor([
 export const sdk = new NodeSDK({
   serviceName: 'inkeep-agents-run-api',
   spanProcessor,
-  textMapPropagator: new CompositePropagator({
-    propagators: [
-      new W3CTraceContextPropagator(),
-      new W3CBaggagePropagator(),
-    ],
-  }),
   instrumentations: [
     getNodeAutoInstrumentations({
       '@opentelemetry/instrumentation-http': {

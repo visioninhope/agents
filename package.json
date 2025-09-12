@@ -24,6 +24,7 @@
     "coverage:diff": "node scripts/coverage-diff.mjs",
     "coverage:enforce": "node scripts/enforce-coverage-change.mjs",
     "coverage:check": "pnpm coverage:diff && pnpm coverage:enforce",
+    "langfuse": "cd langfuse-example && pnpm tsx langfuse-run.ts",
     "lint": "turbo lint",
     "lint:fix": "turbo lint:fix",
     "format": "biome format --write",

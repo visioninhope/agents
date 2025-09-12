@@ -31,9 +31,15 @@ exporters:
     tls:
       insecure: true
 
+  # Export to Langfuse for LLM observability
+  otlphttp/langfuse:
+    endpoint: "https://us.cloud.langfuse.com/api/public/otel" # US region
+    headers:
+      Authorization: "Basic" # BASE64_ENCODED_CREDENTIALS from env var
+
 service:
   pipelines:
     traces:
       receivers: [otlp]
       processors: [attributes, batch]
-      exporters: [otlp/jaeger, otlp/signoz]
+      exporters: [otlp/jaeger, otlp/signoz, otlphttp/langfuse]

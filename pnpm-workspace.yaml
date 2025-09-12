@@ -5,6 +5,7 @@ packages:
   - agents-cli
   - agents-ui
   - examples
+  - langfuse-example
   - agents-docs
   - packages/agents-core
   - packages/agents-sdk
