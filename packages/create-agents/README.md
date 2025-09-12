@@ -6,10 +6,10 @@ Create an Inkeep Agent Framework directory with multi-service architecture.
 
 ```bash
 # Interactive mode
-pnpm create-agents
+npx create-agents
 
 # With directory name
-pnpm create-agents my-agent-directory
+npx create-agents my-agent-directory
 
 # With options
 npx create-agents my-agent-directory --tenant-id default --project-id my-project --openai-key sk-... --anthropic-key sk-ant-...
@@ -22,7 +22,7 @@ npx create-agents my-agent-directory --tenant-id default --project-id my-project
 ### Interactive Mode
 Run without arguments for an interactive setup experience:
 ```bash
-pnpm create-agents
+npx create-agents
 ```
 
 You'll be prompted for:
