@@ -172,17 +172,7 @@ function createExecutionHono(
     cors({
       origin: '*', // public API
       allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowHeaders: [
-        'Content-Type',
-        'Authorization',
-        'X-Inkeep-Tenant-Id',
-        'X-Inkeep-Project-Id',
-        'X-Inkeep-Graph-Id',
-        'X-Inkeep-Agent-Id',
-        'Accept',
-        'Origin',
-        'X-Requested-With',
-      ],
+      allowHeaders: ['*'],
       exposeHeaders: ['Content-Length'],
       maxAge: 86400,
     })
