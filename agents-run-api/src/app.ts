@@ -170,12 +170,7 @@ function createExecutionHono(
   app.use(
     '*',
     cors({
-      origin: (origin) => {
-        if (!origin) return origin;
-        return origin.startsWith('http://localhost:') || origin.startsWith('https://localhost:')
-          ? origin
-          : null;
-      },
+      origin: '*', // public API
       allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
       allowHeaders: ['*'],
       exposeHeaders: ['Content-Length'],
