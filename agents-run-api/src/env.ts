@@ -42,8 +42,7 @@ const envSchema = z.object({
     .optional()
     .default('development'),
   DB_FILE_NAME: z.string().default('file:../local.db'),
-  PORT: z.coerce.number().optional().default(3003),
-  AGENT_BASE_URL: z.string().optional(),
+  AGENTS_RUN_API_URL: z.string().optional().default('http://localhost:3003'),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).optional().default('debug'),
   NANGO_SECRET_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
@@ -56,11 +55,6 @@ const envSchema = z.object({
 const parseEnv = () => {
   try {
     const parsedEnv = envSchema.parse(process.env);
-
-    // Set default AGENT_BASE_URL if not provided
-    if (!parsedEnv.AGENT_BASE_URL) {
-      parsedEnv.AGENT_BASE_URL = `http://localhost:${parsedEnv.PORT}`;
-    }
 
     return parsedEnv;
   } catch (error) {
