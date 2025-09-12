@@ -14,7 +14,7 @@ const getDatabaseUrl = () => {
   }
   
   // If URL is already provided, use as-is
-  if (envUrl.startsWith('http') || path.isAbsolute(envUrl.replace('file:', ''))) {
+  if (envUrl.startsWith('http') || envUrl.startsWith('libsql') || path.isAbsolute(envUrl.replace('file:', ''))) {
     return envUrl;
   }
   
