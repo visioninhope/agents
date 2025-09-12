@@ -185,17 +185,13 @@ export class AgentGraph implements GraphInterface {
           if (toolInstance && typeof toolInstance === 'object') {
             let toolId: string;
 
-            // Check if this is an AgentMcpConfig
-            if ('server' in toolInstance && 'selectedTools' in toolInstance) {
-              const mcpConfig = toolInstance as any; // AgentMcpConfig
-              toolId = mcpConfig.server.getId();
-              // Store the selectedTools mapping (including empty arrays)
-              if (mcpConfig.selectedTools !== undefined) {
-                selectedToolsMapping[toolId] = mcpConfig.selectedTools;
-              }
-            } else {
-              // Regular tool instance
-              toolId = (toolInstance as any).getId?.() || (toolInstance as any).id || toolName;
+            // Get tool ID
+            toolId = (toolInstance as any).getId?.() || (toolInstance as any).id;
+            
+            // Check if this tool instance has selectedTools (from AgentMcpConfig processing)
+            if ('selectedTools' in toolInstance && (toolInstance as any).selectedTools !== undefined) {
+              logger.info({ toolId, selectedTools: (toolInstance as any).selectedTools }, 'Selected tools');
+              selectedToolsMapping[toolId] = (toolInstance as any).selectedTools;
             }
 
             tools.push(toolId);
