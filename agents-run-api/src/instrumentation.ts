@@ -3,15 +3,13 @@ import {
   ALLOW_ALL_BAGGAGE_KEYS,
   BaggageSpanProcessor,
 } from '@opentelemetry/baggage-span-processor';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto';
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { NodeSDK } from '@opentelemetry/sdk-node';
-import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-node';
+import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
+import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions';
+import { resourceFromAttributes } from '@opentelemetry/resources';
 import { env } from './env';
 
-const otlpUrl = env.OTEL_EXPORTER_OTLP_ENDPOINT;
-const otlpExporter = new OTLPTraceExporter({ url: otlpUrl });
-
-// Minimal fan-out so NodeSDK can accept ONE spanProcessor
 class FanOutSpanProcessor {
   constructor(private inner: any[]) {}
   onStart(span: any, parent: any) {
@@ -31,6 +29,8 @@ class FanOutSpanProcessor {
 const maxExportBatchSize =
   env.OTEL_MAX_EXPORT_BATCH_SIZE ?? (env.ENVIRONMENT === 'development' ? 1 : 512);
 
+const otlpExporter = new OTLPTraceExporter();
+
 const spanProcessor = new FanOutSpanProcessor([
   new BaggageSpanProcessor(ALLOW_ALL_BAGGAGE_KEYS),
   new BatchSpanProcessor(otlpExporter, {
@@ -38,9 +38,13 @@ const spanProcessor = new FanOutSpanProcessor([
   }),
 ]);
 
-export const sdk = new NodeSDK({
-  serviceName: 'inkeep-agents-run-api',
-  spanProcessor,
+const resource = resourceFromAttributes({
+  [ATTR_SERVICE_NAME]: 'inkeep-agents-run-api',
+});
+
+const sdk = new NodeSDK({
+  resource: resource,
+  spanProcessor: spanProcessor,
   instrumentations: [
     getNodeAutoInstrumentations({
       '@opentelemetry/instrumentation-http': {
@@ -65,8 +69,4 @@ export const sdk = new NodeSDK({
   ],
 });
 
-// Export the span processor for force flush access
-export { spanProcessor };
-
-// SDK starts automatically when imported
 sdk.start();
