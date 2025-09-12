@@ -36,7 +36,7 @@ async function main() {
     agentId: process.env.INKEEP_AGENT_ID,
     runName: process.env.INKEEP_RUN_NAME,
     baseUrl: process.env.INKEEP_AGENTS_RUN_API_URL,
-    apiKey: process.env.INKEEP_API_KEY,
+    apiKey: process.env.INKEEP_AGENTS_RUN_API_KEY,
   };
 
   // Parse dataset-id from command line arguments
@@ -64,11 +64,18 @@ async function main() {
     process.exit(1);
   }
 
-  // Validate environment variables
-  if (!process.env.LANGFUSE_PUBLIC_KEY || !process.env.LANGFUSE_SECRET_KEY) {
-    console.error(
-      'Missing required environment variables: LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY'
-    );
+  // Validate all required environment variables
+  const requiredEnvVars = [
+    'LANGFUSE_PUBLIC_KEY',
+    'LANGFUSE_SECRET_KEY',
+    'LANGFUSE_BASE_URL',
+    'INKEEP_AGENTS_RUN_API_KEY',
+    'INKEEP_AGENTS_RUN_API_URL',
+  ];
+
+  const missingEnvVars = requiredEnvVars.filter((varName) => !process.env[varName]);
+  if (missingEnvVars.length > 0) {
+    console.error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
     process.exit(1);
   }
 
@@ -102,22 +109,22 @@ async function runDatasetEvaluation(config: RunConfig): Promise<void> {
   );
 
   // Get API key from config or environment
-  const authKey = apiKey || process.env.INKEEP_API_KEY;
+  const authKey = apiKey || process.env.INKEEP_AGENTS_RUN_API_KEY;
   if (!authKey) {
-    throw new Error(
-      'API key is required. Provide --api-key or set INKEEP_API_KEY environment variable'
-    );
+    throw new Error('API key is required. Set INKEEP_AGENTS_RUN_API_KEY environment variable');
   }
 
-  const chatBaseUrl = baseUrl || 'http://localhost:3003';
+  if (!baseUrl) {
+    throw new Error('Base URL is required. Set INKEEP_AGENTS_RUN_API_URL environment variable');
+  }
 
-  logger.info({ chatBaseUrl }, 'Starting dataset evaluation run');
+  logger.info({ baseUrl }, 'Starting dataset evaluation run');
 
   // Initialize Langfuse client
   const langfuse = new Langfuse({
-    publicKey: process.env.LANGFUSE_PUBLIC_KEY || '',
-    secretKey: process.env.LANGFUSE_SECRET_KEY || '',
-    baseUrl: process.env.LANGFUSE_BASE_URL || 'https://us.cloud.langfuse.com',
+    publicKey: process.env.LANGFUSE_PUBLIC_KEY,
+    secretKey: process.env.LANGFUSE_SECRET_KEY,
+    baseUrl: process.env.LANGFUSE_BASE_URL,
   });
 
   // Get the dataset
@@ -158,7 +165,7 @@ async function runDatasetEvaluation(config: RunConfig): Promise<void> {
         userMessage,
         agentId,
         datasetItem: item,
-        chatBaseUrl,
+        baseUrl,
         authKey,
         executionContext: {
           tenantId,
@@ -169,12 +176,14 @@ async function runDatasetEvaluation(config: RunConfig): Promise<void> {
         datasetId,
       });
 
-      // Link the execution trace to the dataset item using item.link()
+      // Link the execution trace to the dataset item using cross-tools approach
       if (result.traceId && result.trace) {
         await langfuse.flushAsync();
         await item.link(result.trace, runLabel, {
-          description: 'Dataset run via Inkeep Agent Framework',
+          description: 'Dataset run via Inkeep Agent Framework (correlated via x-request-id)',
           metadata: {
+            xRequestId: result.xRequestId,
+            datasetId,
             tenantId,
             projectId,
             graphId,
@@ -188,8 +197,9 @@ async function runDatasetEvaluation(config: RunConfig): Promise<void> {
       itemLogger.info(
         {
           traceId: result.traceId,
+          xRequestId: result.xRequestId,
         },
-        'Completed processing dataset item and linked trace'
+        'Completed processing dataset item and linked trace via cross-tools correlation'
       );
     } catch (error) {
       itemLogger.error(
@@ -218,7 +228,7 @@ async function runDatasetItemThroughChatAPI({
   userMessage,
   agentId,
   datasetItem,
-  chatBaseUrl,
+  baseUrl,
   authKey,
   executionContext,
   langfuse,
@@ -227,7 +237,7 @@ async function runDatasetItemThroughChatAPI({
   userMessage: string;
   agentId?: string;
   datasetItem: any;
-  chatBaseUrl: string;
+  baseUrl: string;
   authKey: string;
   executionContext: {
     tenantId: string;
@@ -241,6 +251,8 @@ async function runDatasetItemThroughChatAPI({
   error?: string;
   traceId?: string;
   trace?: any;
+  xRequestId?: string;
+  traceparent?: string;
 }> {
   try {
     // Prepare the chat request payload (let API generate conversationId)
@@ -255,7 +267,7 @@ async function runDatasetItemThroughChatAPI({
     };
 
     // Make request to chat endpoint
-    const response = await fetch(`${chatBaseUrl}/api/chat`, {
+    const response = await fetch(`${baseUrl}/api/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -263,7 +275,7 @@ async function runDatasetItemThroughChatAPI({
         'x-inkeep-tenant-id': executionContext.tenantId,
         'x-inkeep-project-id': executionContext.projectId,
         'x-inkeep-graph-id': executionContext.graphId,
-        'baggage': `run.type=langfuse-dataset-run,dataset.id=${datasetId}`,
+        baggage: `run.type=langfuse-dataset-run,dataset.id=${datasetId}`,
       },
       body: JSON.stringify(chatPayload),
     });
@@ -285,40 +297,64 @@ async function runDatasetItemThroughChatAPI({
       };
     }
 
-    // Extract the trace ID from the response header
-    const traceId = response.headers.get('x-trace-id');
-    logger.info({ traceId }, 'Received trace ID from chat API');
+    // Extract headers from response for cross tools correlation
+    const headers: Record<string, string> = {};
+    response.headers.forEach((v, k) => {
+      headers[k] = v;
+    });
+    const xRequestId = headers['x-request-id']; // present in your response
+    const traceparent = headers['traceparent']; // W3C Trace Context
+
+    logger.info(
+      {
+        xRequestId,
+        traceparent,
+        responseHeaders: headers,
+      },
+      'Response headers and correlation ID'
+    );
 
     const responseText = await response.text();
     const assistantResponse = parseSSEResponse(responseText);
 
-    // Create a trace reference if we have a trace ID
-    let trace = null;
-    if (traceId) {
-      trace = langfuse.trace({
-        id: traceId,
-        name: `Dataset Item Execution: ${datasetItem.id}`,
-        input: userMessage,
-        output: assistantResponse || 'No response generated',
-        metadata: {
-          datasetItemId: datasetItem.id,
-          agentId,
-          tenantId: executionContext.tenantId,
-          projectId: executionContext.projectId,
-          graphId: executionContext.graphId,
-        },
-        tags: ['dataset-evaluation'],
-      });
-      logger.info({ traceId }, 'Created trace reference');
-    } else {
-      logger.warn('No trace ID received from chat API');
-    }
+    // Create a Langfuse trace (no external id available) - Cross Tools approach
+    const extractedTraceId = extractTraceIdFromTraceparent(traceparent);
+    const trace = langfuse.trace({
+      name: `Dataset Item Execution: ${datasetItem.id}`,
+      traceId: extractedTraceId,
+      input: userMessage,
+      output: assistantResponse || 'No response generated',
+      metadata: {
+        datasetId,
+        datasetItemId: datasetItem.id,
+        xRequestId, // <-- correlation key
+        traceparent, // <-- W3C trace context
+        responseHeaders: headers, // optional: keep for later debugging
+        // you can also include tenant/project/graph to make lookups easy
+        tenantId: executionContext.tenantId,
+        projectId: executionContext.projectId,
+        graphId: executionContext.graphId,
+        agentId,
+      },
+      tags: ['dataset-evaluation', 'cross-tools'],
+    });
+
+    logger.info(
+      {
+        xRequestId,
+        traceId: trace.id,
+      },
+      'Created cross-tools trace with x-request-id correlation'
+    );
+
     await langfuse.flushAsync();
 
     return {
       response: assistantResponse || 'No response generated',
-      traceId: traceId || undefined,
+      traceId: trace.id,
       trace,
+      xRequestId, // Include x-request-id for correlation
+      traceparent, // Include traceparent for W3C trace context
     };
   } catch (error) {
     logger.error(
@@ -333,6 +369,19 @@ async function runDatasetItemThroughChatAPI({
       error: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+// Helper function to extract trace ID from W3C traceparent header
+function extractTraceIdFromTraceparent(traceparent: string | undefined): string | undefined {
+  if (!traceparent) return undefined;
+  
+  // W3C traceparent format: version-trace_id-parent_id-trace_flags
+  // Example: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+  const parts = traceparent.split('-');
+  if (parts.length >= 2) {
+    return parts[1]; // Return the trace_id part
+  }
+  return undefined;
 }
 
 // Helper function to parse SSE response and extract assistant message

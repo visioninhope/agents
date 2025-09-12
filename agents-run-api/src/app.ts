@@ -13,6 +13,8 @@ import { requestId } from 'hono/request-id';
 import type { StatusCode } from 'hono/utils/http-status';
 import { pinoLogger } from 'hono-pino';
 import { pino } from 'pino';
+import { tracerProvider } from './instrumentation';
+//import { sdkTracerProvider } from './instrumentation';
 import { getLogger } from './logger';
 import { apiKeyAuth } from './middleware/api-key-auth';
 import { setupOpenAPIRoutes } from './openapi';
@@ -35,6 +37,11 @@ function createExecutionHono(
 
   // Request ID middleware
   app.use('*', requestId());
+
+  app.use('*', (c, next) => {
+    c.header('traceparent', c.req.header('traceparent') || '');
+    return next();
+  });
 
   // Server config and credential stores middleware
   app.use('*', async (c, next) => {
@@ -206,6 +213,8 @@ function createExecutionHono(
         // Silently ignore parse errors for non-JSON bodies
       }
     }
+    console.log(c.req.header, 'HEADERS');
+    console.log(c.req.header('traceparent'), 'traceparent');
 
     const entries = Object.fromEntries(
       Object.entries({
@@ -250,6 +259,27 @@ function createExecutionHono(
       return c.body(null, 204);
     }
   );
+
+  // // Force flush middleware
+  // app.use('/v1/chat', async (_c, next) => {
+  //   await next();
+  //   await sdkTracerProvider.forceFlush();
+  // });
+
+  // app.use('/v1/mcp', async (_c, next) => {
+  //   await next();
+  //   await sdkTracerProvider.forceFlush();
+  // });
+
+  // app.use('/api/chat', async (_c, next) => {
+  //   await next();
+  //   await tracerProvider.forceFlush();
+  // });
+
+  // app.use('/agents', async (_c, next) => {
+  //   await next();
+  //   await sdkTracerProvider.forceFlush();
+  // });
 
   // Mount execution routes - API key provides tenant, project, and graph context
   app.route('/v1/chat', chatRoutes);
