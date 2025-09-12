@@ -2,11 +2,11 @@
 
 import { ChevronRight } from 'lucide-react';
 import { type Control, useController, useWatch } from 'react-hook-form';
+import { ExpandableJsonEditor } from '@/components/form/expandable-json-editor';
+import { ModelSelector } from '@/components/graph/sidepane/nodes/model-selector';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ExpandableJsonEditor } from '@/components/form/expandable-json-editor';
 import { Label } from '@/components/ui/label';
-import { ModelSelector } from '@/components/graph/sidepane/nodes/model-selector';
 import type { ProjectFormData } from './validation';
 
 interface ProjectModelsSectionProps {
@@ -30,6 +30,8 @@ function BaseModelSection({ control }: { control: Control<ProjectFormData> }) {
         placeholder="Select base model"
         value={modelField.value || ''}
         onValueChange={modelField.onChange}
+        isRequired
+        canClear={false}
       />
       <p className="text-xs text-muted-foreground">Primary model for general agent responses</p>
       <ExpandableJsonEditor
@@ -80,6 +82,7 @@ function StructuredOutputModelSection({ control }: { control: Control<ProjectFor
         value={modelField.value || ''}
         onValueChange={modelField.onChange}
         inheritedValue={baseModel}
+        canClear={true}
       />
       <p className="text-xs text-muted-foreground">
         Model for structured outputs and data components (defaults to base model)
@@ -132,6 +135,7 @@ function SummarizerModelSection({ control }: { control: Control<ProjectFormData>
         value={modelField.value || ''}
         onValueChange={modelField.onChange}
         inheritedValue={baseModel}
+        canClear={true}
       />
       <p className="text-xs text-muted-foreground">
         Model for summarization tasks (defaults to base model)
@@ -164,20 +168,6 @@ function SummarizerModelSection({ control }: { control: Control<ProjectFormData>
 }
 
 export function ProjectModelsSection({ control }: ProjectModelsSectionProps) {
-  // Check if any model is configured to determine default open state
-  const modelsBase = useWatch({ control, name: 'models.base' });
-  const modelsStructuredOutput = useWatch({ control, name: 'models.structuredOutput' });
-  const modelsSummarizer = useWatch({ control, name: 'models.summarizer' });
-
-  const hasConfiguredModels = !!(
-    modelsBase?.model ||
-    modelsStructuredOutput?.model ||
-    modelsSummarizer?.model ||
-    modelsBase?.providerOptions ||
-    modelsStructuredOutput?.providerOptions ||
-    modelsSummarizer?.providerOptions
-  );
-
   return (
     <div className="space-y-4">
       <div>
@@ -187,13 +177,13 @@ export function ProjectModelsSection({ control }: ProjectModelsSectionProps) {
         </p>
       </div>
 
-      <Collapsible defaultOpen={hasConfiguredModels}>
+      <Collapsible defaultOpen={true}>
         <CollapsibleTrigger asChild>
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="flex items-center justify-start gap-2 w-full"
+            className="flex items-center justify-start gap-2 w-full group"
           >
             <ChevronRight className="h-4 w-4 transition-transform duration-200 group-data-[state=open]:rotate-90" />
             Configure Default Models

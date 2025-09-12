@@ -24,6 +24,8 @@ interface ModelSelectorProps {
   onValueChange?: (value: string) => void;
   placeholder?: string;
   inheritedValue?: string;
+  isRequired?: boolean;
+  canClear?: boolean;
 }
 
 export function ModelSelector({
@@ -33,6 +35,8 @@ export function ModelSelector({
   onValueChange,
   placeholder = 'Select a model...',
   inheritedValue,
+  isRequired = false,
+  canClear = true,
 }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
 
@@ -67,6 +71,7 @@ export function ModelSelector({
             </Tooltip>
           </TooltipProvider>
         )}
+        {isRequired && <span className="text-red-500">*</span>}
       </Label>
       <div className="flex w-full shadow-xs rounded-md">
         <Popover open={open} onOpenChange={setOpen}>
@@ -77,7 +82,7 @@ export function ModelSelector({
               aria-expanded={open}
               className={cn(
                 'justify-between bg-background dark:bg-background flex-1 text-foreground shadow-none truncate',
-                selectedModel ? 'rounded-r-none border-r-0' : 'rounded-r-md'
+                selectedModel && canClear ? 'rounded-r-none border-r-0' : 'rounded-r-md'
               )}
             >
               {selectedModel ? (
@@ -97,6 +102,12 @@ export function ModelSelector({
             className="p-0 w-[var(--radix-popover-trigger-width)] transition-all duration-200 ease-in-out"
             align="start"
             side="bottom"
+            onWheel={(e) => {
+              e.stopPropagation(); // to make scroll work inside dialog https://github.com/radix-ui/primitives/issues/1159
+            }}
+            onTouchMove={(e) => {
+              e.stopPropagation(); // to make scroll work inside dialog https://github.com/radix-ui/primitives/issues/1159
+            }}
           >
             <Command>
               <CommandInput placeholder="Search models..." />
@@ -131,26 +142,28 @@ export function ModelSelector({
             </Command>
           </PopoverContent>
         </Popover>
-        <div
-          className={cn(
-            'transition-all duration-200 ease-in-out overflow-hidden',
-            selectedModel ? 'w-10 opacity-100 scale-100' : 'w-0 opacity-0 scale-95'
-          )}
-        >
-          <Button
-            variant="outline"
-            size="icon"
-            className="rounded-l-none border-l-0 px-2 bg-transparent w-10 transition-all duration-200 ease-in-out text-muted-foreground hover:text-foreground"
-            onClick={() => {
-              onValueChange?.('');
-            }}
-            aria-label="Clear model selection"
-            type="button"
-            disabled={!selectedModel}
+        {canClear && (
+          <div
+            className={cn(
+              'transition-all duration-200 ease-in-out overflow-hidden',
+              selectedModel && canClear ? 'w-10 opacity-100 scale-100' : 'w-0 opacity-0 scale-95'
+            )}
           >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
+            <Button
+              variant="outline"
+              size="icon"
+              className="rounded-l-none border-l-0 px-2 bg-transparent w-10 transition-all duration-200 ease-in-out text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                onValueChange?.('');
+              }}
+              aria-label="Clear model selection"
+              type="button"
+              disabled={!selectedModel}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

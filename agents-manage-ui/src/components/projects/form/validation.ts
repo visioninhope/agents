@@ -5,14 +5,11 @@ const modelSettingsSchema = z.object({
   providerOptions: z.record(z.string(), z.any()).optional(),
 });
 
-const projectModelsSchema = z
-  .object({
-    base: modelSettingsSchema.optional(),
-    structuredOutput: modelSettingsSchema.optional(),
-    summarizer: modelSettingsSchema.optional(),
-  })
-  .optional()
-  .nullable();
+const projectModelsSchema = z.object({
+  base: modelSettingsSchema,
+  structuredOutput: modelSettingsSchema.optional(),
+  summarizer: modelSettingsSchema.optional(),
+});
 
 const projectStopWhenSchema = z
   .object({

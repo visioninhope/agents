@@ -33,7 +33,7 @@ export function ProjectStopWhenSection({ control }: ProjectStopWhenSectionProps)
             type="button"
             variant="outline"
             size="sm"
-            className="flex items-center justify-start gap-2 w-full"
+            className="flex items-center justify-start gap-2 w-full group"
           >
             <ChevronRight className="h-4 w-4 transition-transform duration-200 group-data-[state=open]:rotate-90" />
             Configure Execution Limits
