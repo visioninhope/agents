@@ -339,8 +339,8 @@ describe('create command', () => {
 
       // Check agent graph
       expect(mockFs.writeFile).toHaveBeenCalledWith(
-        'src/test-project-id/hello.graph.ts',
-        expect.stringContaining("import { agent, agentGraph } from '@inkeep/agents-sdk'")
+        'src/test-project-id/weather.graph.ts',
+        expect.stringContaining("import { agent, agentGraph, mcpTool } from '@inkeep/agents-sdk'")
       );
 
       // Check inkeep config
