@@ -817,9 +817,9 @@ This project follows a workspace structure with the following services:
 1. **Start services:**
    \`\`\`bash
    # Start Agents Manage API and Agents Run API
-   pnpm run dev
+   pnpm dev
    
-   # Start Dashboard
+   # Start the Dashboard
    inkeep dev
    \`\`\`
 
