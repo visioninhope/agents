@@ -392,6 +392,7 @@ const getServer = async (
 
 type AppVariables = {
   credentialStores: CredentialStoreRegistry;
+  requestBody?: any;
 };
 
 const app = new OpenAPIHono<{ Variables: AppVariables }>();
@@ -640,7 +641,8 @@ app.openapi(
 
       const { executionContext } = paramValidation;
 
-      const body = await c.req.json();
+      // Get parsed body from middleware (shared across all handlers)
+      const body = c.get('requestBody') || {};
       logger.info({ body, bodyKeys: Object.keys(body || {}) }, 'Parsed request body');
 
       const isInitRequest = body.method === 'initialize';
