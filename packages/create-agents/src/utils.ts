@@ -269,7 +269,7 @@ export const createAgents = async (
 
     // Setup project in database
     s.message('Setting up project in database...');
-    await setupProjectInDatabase(config);
+    await setupProjectInDatabase();
 
     s.stop();
 
@@ -1099,7 +1099,7 @@ async function installDependencies() {
   await execAsync('pnpm install');
 }
 
-async function setupProjectInDatabase(config: FileConfig) {
+async function setupProjectInDatabase() {
     const s = p.spinner();
     s.start('🚀 Starting development servers and setting up database...');
     
