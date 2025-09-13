@@ -19,6 +19,7 @@ import agentRoutes from './routes/agents';
 import chatRoutes from './routes/chat';
 import chatDataRoutes from './routes/chatDataStream';
 import mcpRoutes from './routes/mcp';
+import { otel } from '@hono/otel'
 
 const logger = getLogger('agents-run-api');
 
@@ -34,6 +35,8 @@ function createExecutionHono(
   credentialStores: CredentialStoreRegistry
 ) {
   const app = new OpenAPIHono<{ Variables: AppVariables }>();
+
+  app.use('*', otel());
 
   // Request ID middleware
   app.use('*', requestId());
