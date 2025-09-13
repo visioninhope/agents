@@ -191,6 +191,7 @@ function createExecutionHono(
 
     if (!executionContext) {
       // No API key context, skip baggage setup
+      logger.debug('Empty execution context');
       return next();
     }
 
@@ -222,6 +223,7 @@ function createExecutionHono(
     );
 
     if (!Object.keys(entries).length) {
+      logger.debug('Empty entries for baggage');
       return next();
     }
 
