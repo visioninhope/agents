@@ -199,8 +199,10 @@ function createExecutionHono(
     // Extract conversation ID from JSON body if present
     let conversationId: string | undefined;
     if (c.req.header('content-type')?.includes('application/json')) {
+      //look into
       try {
-        const body = await c.req.json();
+        const cloned = c.req.raw.clone();
+        const body = await cloned.json().catch(() => null);
         conversationId = body?.conversationId;
       } catch (_) {
         logger.debug('Conversation ID not found in JSON body');
