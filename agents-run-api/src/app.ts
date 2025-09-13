@@ -69,7 +69,7 @@ function createExecutionHono(
     if (bag && typeof bag.setEntry === 'function') {
       bag = bag.setEntry('request.id', { value: String(reqId ?? 'unknown') });
       const ctxWithBag = propagation.setBaggage(otelContext.active(), bag);
-      return otelContext.with(ctxWithBag, () => next());
+      return await otelContext.with(ctxWithBag, async () => await next());
     }
     return next();
   });
@@ -227,7 +227,7 @@ function createExecutionHono(
     );
 
     const ctxWithBag = propagation.setBaggage(otelContext.active(), bag);
-    return otelContext.with(ctxWithBag, () => next());
+    return await otelContext.with(ctxWithBag, async () => await next());
   });
 
   // Health check endpoint (no auth required)
