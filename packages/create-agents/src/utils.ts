@@ -599,7 +599,7 @@ dotenv.config();
 const dbUrl = process.env.DB_FILE_NAME || 'file:local.db';
 const tenantId = '${config.tenantId}';
 const projectId = '${config.projectId}';
-const projectName = '${config.dirName}';
+const projectName = '${config.projectId}';
 const projectDescription = 'Generated Inkeep Agents project';
 
 async function setupProject() {
