@@ -15,7 +15,14 @@ vi.mock('@ai-sdk/anthropic', () => {
 
 vi.mock('@ai-sdk/openai', () => {
   const mockOpenAIModel = { type: 'openai', modelId: 'gpt-4o' } as LanguageModel;
-  const mockOpenAIProvider = vi.fn().mockReturnValue(mockOpenAIModel);
+  const mockOpenRouterModel = { type: 'openrouter', modelId: 'meta-llama/llama-2-70b-chat' } as LanguageModel;
+  const mockCustomModel = { type: 'custom', modelId: 'custom-model' } as LanguageModel;
+  
+  const mockOpenAIProvider = vi.fn((modelName: string) => {
+    if (modelName.includes('llama')) return mockOpenRouterModel;
+    if (modelName.includes('custom')) return mockCustomModel;
+    return mockOpenAIModel;
+  });
 
   return {
     openai: vi.fn().mockReturnValue(mockOpenAIModel),
@@ -562,7 +569,7 @@ describe('ModelFactory', () => {
         expect(errors).toEqual([]);
       });
 
-      test('should reject config with API keys in provider options', () => {
+      test('should allow config with API keys in provider options (with warning)', () => {
         const config: ModelSettings = {
           model: 'anthropic/claude-4-sonnet-20250514',
           providerOptions: {
@@ -571,25 +578,36 @@ describe('ModelFactory', () => {
           },
         };
 
+        // Should not return errors, just log warning
         const errors = ModelFactory.validateConfig(config);
-        expect(errors).toHaveLength(1);
-        expect(errors[0]).toContain('API keys should not be stored in provider options');
-        expect(errors[0]).toContain('Use environment variables');
+        expect(errors).toHaveLength(0);
       });
 
-      test('should reject config with API keys in different scenarios', () => {
+      test('should allow OpenRouter config with API key', () => {
         const config: ModelSettings = {
-          model: 'openai/gpt-4o',
+          model: 'openrouter/meta-llama/llama-2-70b-chat',
           providerOptions: {
-            apiKey: 'sk-test123',
+            apiKey: 'or-test123',
             temperature: 0.5,
           },
         };
 
         const errors = ModelFactory.validateConfig(config);
-        expect(errors).toHaveLength(1);
-        expect(errors[0]).toContain('API keys should not be stored in provider options');
-        expect(errors[0]).toContain('Use environment variables');
+        expect(errors).toHaveLength(0);
+      });
+
+      test('should allow custom provider config with baseURL and API key', () => {
+        const config: ModelSettings = {
+          model: 'custom/my-model',
+          providerOptions: {
+            baseURL: 'https://api.custom.com/v1',
+            apiKey: 'custom-key',
+            headers: { 'X-Custom': 'value' },
+          },
+        };
+
+        const errors = ModelFactory.validateConfig(config);
+        expect(errors).toHaveLength(0);
       });
 
       test('should allow valid configs without API keys', () => {
@@ -638,6 +656,89 @@ describe('ModelFactory', () => {
           modelName: 'claude-4-sonnet',
         });
       });
+    });
+
+    test('should handle OpenRouter model with slashes in model name', () => {
+      const result = ModelFactory.parseModelString('openrouter/meta-llama/llama-2-70b-chat');
+      expect(result).toEqual({
+        provider: 'openrouter',
+        modelName: 'meta-llama/llama-2-70b-chat',
+      });
+    });
+
+    test('should parse custom provider correctly', () => {
+      const result = ModelFactory.parseModelString('custom/my-custom-model');
+      expect(result).toEqual({
+        provider: 'custom',
+        modelName: 'my-custom-model',
+      });
+    });
+  });
+
+  describe('OpenRouter integration', () => {
+    test('should create OpenRouter model with environment variable', () => {
+      const originalEnv = process.env.OPENROUTER_API_KEY;
+      process.env.OPENROUTER_API_KEY = 'test-openrouter-key';
+
+      const config: ModelSettings = {
+        model: 'openrouter/meta-llama/llama-2-70b-chat',
+      };
+
+      const model = ModelFactory.createModel(config);
+      expect(model).toBeDefined();
+      expect(model).toHaveProperty('type', 'openrouter');
+
+      // Restore original env
+      if (originalEnv === undefined) {
+        delete process.env.OPENROUTER_API_KEY;
+      } else {
+        process.env.OPENROUTER_API_KEY = originalEnv;
+      }
+    });
+
+    test('should create OpenRouter model with custom baseURL', () => {
+      const config: ModelSettings = {
+        model: 'openrouter/meta-llama/llama-2-70b-chat',
+        providerOptions: {
+          baseURL: 'https://custom-openrouter.com/v1',
+        },
+      };
+
+      const model = ModelFactory.createModel(config);
+      expect(model).toBeDefined();
+      expect(model).toHaveProperty('type', 'openrouter');
+    });
+  });
+
+  describe('Custom provider integration', () => {
+    test('should create custom provider model with required baseURL', () => {
+      const config: ModelSettings = {
+        model: 'custom/my-model',
+        providerOptions: {
+          baseURL: 'https://api.custom-provider.com/v1',
+        },
+      };
+
+      const model = ModelFactory.createModel(config);
+      expect(model).toBeDefined();
+      expect(model).toHaveProperty('type', 'custom');
+    });
+
+    test('should support custom headers for custom provider', () => {
+      const config: ModelSettings = {
+        model: 'custom/my-model',
+        providerOptions: {
+          baseURL: 'https://api.custom-provider.com/v1',
+          headers: {
+            'X-API-Version': 'v2',
+            'X-Organization': 'my-org',
+          },
+        },
+      };
+
+      const model = ModelFactory.createModel(config);
+      expect(model).toBeDefined();
+      expect(model).toHaveProperty('type', 'custom');
     });
   });
 });

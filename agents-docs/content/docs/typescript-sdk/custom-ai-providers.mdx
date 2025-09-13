@@ -1,0 +1,223 @@
+---
+title: Custom AI Providers
+description: Configure OpenRouter and custom AI providers for your agents
+icon: "LuGlobe"
+---
+
+The Inkeep Agent Framework supports multiple AI providers beyond the standard Anthropic and OpenAI models. You can use OpenRouter to access a wide variety of models, or configure any OpenAI-compatible API endpoint as a custom provider.
+
+## Supported Providers
+
+The framework now supports four provider types:
+
+- **Anthropic** - Claude models (default)
+- **OpenAI** - GPT models
+- **OpenRouter** - Access to 100+ models through a unified API
+- **Custom** - Any OpenAI-compatible API endpoint
+
+## Using OpenRouter
+
+OpenRouter provides access to models from various providers through a single API. To use OpenRouter models:
+
+### 1. Set up your API key
+
+```bash
+export OPENROUTER_API_KEY="or-your-api-key-here"
+```
+
+### 2. Configure your agent
+
+```typescript
+const agent = agent({
+  id: "openrouter-agent",
+  name: "OpenRouter Agent",
+  description: "Agent using OpenRouter models",
+  prompt: "Your agent prompt here",
+  models: {
+    base: {
+      model: "openrouter/meta-llama/llama-2-70b-chat",
+      providerOptions: {
+        temperature: 0.7,
+        maxTokens: 2048,
+      },
+    },
+  },
+});
+```
+
+### Available OpenRouter Models
+
+Common models available through OpenRouter include:
+
+- `openrouter/meta-llama/llama-2-70b-chat` - Llama 2 70B
+- `openrouter/meta-llama/llama-2-13b-chat` - Llama 2 13B
+- `openrouter/mistralai/mixtral-8x7b-instruct` - Mixtral 8x7B
+- `openrouter/google/gemini-pro` - Google Gemini Pro
+- `openrouter/anthropic/claude-3-opus` - Claude 3 Opus
+- `openrouter/openai/gpt-4-turbo` - GPT-4 Turbo
+- `openrouter/deepseek/deepseek-chat` - DeepSeek Chat
+
+Visit [OpenRouter's model list](https://openrouter.ai/models) for the complete catalog.
+
+### Advanced OpenRouter Configuration
+
+```typescript
+models: {
+  base: {
+    model: "openrouter/meta-llama/llama-2-70b-chat",
+    providerOptions: {
+      temperature: 0.7,
+      maxTokens: 2048,
+      // Optional: Override the default OpenRouter API URL
+      baseURL: "https://openrouter.ai/api/v1",
+      // Optional: Add custom headers
+      headers: {
+        "HTTP-Referer": "https://your-app.com",
+        "X-Title": "Your App Name",
+      },
+      // Optional: Include API key in options (not recommended)
+      apiKey: "or-your-api-key",
+    },
+  },
+}
+```
+
+## Using Custom Providers
+
+You can configure any OpenAI-compatible API endpoint as a custom provider. This is useful for:
+
+- Self-hosted models (e.g., vLLM, Ollama, LocalAI)
+- Private cloud deployments
+- Alternative API providers with OpenAI-compatible endpoints
+
+### Basic Custom Provider Setup
+
+```typescript
+const agent = agent({
+  id: "custom-provider-agent",
+  name: "Custom Provider Agent",
+  description: "Agent using a custom AI provider",
+  prompt: "Your agent prompt here",
+  models: {
+    base: {
+      model: "custom/your-model-name",
+      providerOptions: {
+        // Required: The base URL of your API
+        baseURL: "https://api.your-provider.com/v1",
+        // Optional: Authentication
+        apiKey: "your-api-key",
+        // Optional: Model parameters
+        temperature: 0.7,
+        maxTokens: 2048,
+        // Optional: Custom headers
+        headers: {
+          "X-Custom-Header": "value",
+        },
+      },
+    },
+  },
+});
+```
+
+### Example: Using Ollama Locally
+
+```typescript
+models: {
+  base: {
+    model: "custom/llama2:7b",
+    providerOptions: {
+      baseURL: "http://localhost:11434/v1",
+      temperature: 0.7,
+      maxTokens: 2048,
+    },
+  },
+}
+```
+
+### Example: Using Together AI
+
+```typescript
+models: {
+  base: {
+    model: "custom/togethercomputer/llama-2-70b-chat",
+    providerOptions: {
+      baseURL: "https://api.together.xyz/v1",
+      apiKey: process.env.TOGETHER_API_KEY,
+      temperature: 0.7,
+      maxTokens: 2048,
+    },
+  },
+}
+```
+
+## Model Inheritance
+
+Custom provider models follow the same inheritance rules as standard models:
+
+1. **Project Level** - Set default models for all agents in a project
+2. **Graph Level** - Override project defaults for specific agent graphs
+3. **Agent Level** - Override graph defaults for individual agents
+
+Provider options are inherited along with the model selection.
+
+## Best Practices
+
+### API Key Management
+
+While you can include API keys in provider options, we recommend using environment variables:
+
+```bash
+# .env file
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
+OPENROUTER_API_KEY=or-...
+CUSTOM_PROVIDER_API_KEY=your-key
+```
+
+Then reference them in your code:
+
+```typescript
+providerOptions: {
+  apiKey: process.env.CUSTOM_PROVIDER_API_KEY,
+  // ... other options
+}
+```
+
+### Model Selection Tips
+
+1. **Match models to tasks** - Use larger models for complex reasoning, smaller models for simple tasks
+2. **Consider latency** - Self-hosted or regional endpoints may have better latency
+3. **Test compatibility** - Ensure your custom provider fully implements the OpenAI API
+4. **Monitor costs** - Different providers have different pricing models
+
+### Error Handling
+
+Custom providers may have different error formats. The framework will attempt to normalize errors, but you should test error scenarios:
+
+```typescript
+try {
+  const response = await agent.generate("Your prompt");
+} catch (error) {
+  // Handle provider-specific errors
+  console.error("Provider error:", error);
+}
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **"Custom provider requires a baseURL"** - Ensure you've specified the baseURL in providerOptions
+2. **Authentication errors** - Check your API key and authentication headers
+3. **Model not found** - Verify the model name matches what your provider expects
+4. **Timeout errors** - Increase the timeout in providerOptions or check your network connection
+
+### Debug Logging
+
+Enable debug logging to troubleshoot provider issues:
+
+```bash
+LOG_LEVEL=debug npm run dev
+```
+
+This will show detailed information about model creation and API calls.

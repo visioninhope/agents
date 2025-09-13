@@ -48,4 +48,40 @@ export const modelOptions = {
       label: 'openai/gpt-4.1-nano-2025-04-14',
     },
   ],
+  openrouter: [
+    {
+      value: 'openrouter/meta-llama/llama-2-70b-chat',
+      label: 'openrouter/meta-llama/llama-2-70b-chat',
+    },
+    {
+      value: 'openrouter/meta-llama/llama-2-13b-chat',
+      label: 'openrouter/meta-llama/llama-2-13b-chat',
+    },
+    {
+      value: 'openrouter/mistralai/mixtral-8x7b-instruct',
+      label: 'openrouter/mistralai/mixtral-8x7b-instruct',
+    },
+    {
+      value: 'openrouter/google/gemini-pro',
+      label: 'openrouter/google/gemini-pro',
+    },
+    {
+      value: 'openrouter/anthropic/claude-3-opus',
+      label: 'openrouter/anthropic/claude-3-opus',
+    },
+    {
+      value: 'openrouter/openai/gpt-4-turbo',
+      label: 'openrouter/openai/gpt-4-turbo',
+    },
+    {
+      value: 'openrouter/deepseek/deepseek-chat',
+      label: 'openrouter/deepseek/deepseek-chat',
+    },
+  ],
+  custom: [
+    {
+      value: 'custom/your-model-name',
+      label: 'custom/your-model-name (configure in provider options)',
+    },
+  ],
 };

@@ -6,6 +6,7 @@ export default {
       icon: 'LuCode',
       pages: [
         'typescript-sdk/agent-configuration',
+        'typescript-sdk/custom-ai-providers',
         'typescript-sdk/agent-relationships',
         'typescript-sdk/external-agent-configuration',
         'typescript-sdk/tools-and-mcp-servers',

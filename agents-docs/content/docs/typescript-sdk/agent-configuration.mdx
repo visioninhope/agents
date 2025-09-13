@@ -130,26 +130,32 @@ const agent = agent({
 
 ## Model Settings
 
-The `models` object allows you to configure different models for different tasks, each with their own provider options:
+The `models` object allows you to configure different models for different tasks, each with their own provider options. The framework supports multiple providers including Anthropic, OpenAI, OpenRouter, and custom AI providers.
 
 ```typescript
 models: {
   base: {
     model: "anthropic/claude-4-sonnet-20250514", // Primary model for text generation
+    // Or use other providers:
+    // model: "openai/gpt-5-2025-08-07",
+    // model: "openrouter/meta-llama/llama-2-70b-chat",
+    // model: "custom/your-model-name",
     providerOptions: {
       temperature: 0.7,
-      maxTokens: 2048
+      maxTokens: 2048,
+      // For custom providers:
+      // baseURL: "https://api.your-provider.com/v1",
     }
   },
   structuredOutput: {
-    model: "openai/gpt-4o-mini-2024-07-18", // For structured JSON output only
+    model: "openai/gpt-4.1-mini-2025-04-14", // For structured JSON output only
     providerOptions: {
       temperature: 0.1,
       maxTokens: 1024
     }
   },
   summarizer: {
-    model: "anthropic/claude-3-haiku-20240307", // For summaries and status updates
+    model: "openai/gpt-4.1-nano-2025-04-14", // For summaries and status updates
     providerOptions: {
       temperature: 0.5,
       maxTokens: 1000
@@ -157,6 +163,8 @@ models: {
   }
 }
 ```
+
+See [Custom AI Providers](/typescript-sdk/custom-ai-providers) for detailed configuration of OpenRouter and custom providers.
 
 ### Model Types
 

@@ -7,6 +7,7 @@ import { ModelSelector } from '@/components/graph/sidepane/nodes/model-selector'
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Label } from '@/components/ui/label';
+import { ProviderConfigHelp } from './provider-config-help';
 import type { ProjectFormData } from './validation';
 
 interface ProjectModelsSectionProps {
@@ -56,7 +57,12 @@ function BaseModelSection({ control }: { control: Control<ProjectFormData> }) {
         }}
         placeholder={`{
   "temperature": 0.7,
-  "maxTokens": 2048
+  "maxTokens": 2048,
+  // For OpenRouter:
+  // "apiKey": "or-...",
+  // For Custom providers:
+  // "baseURL": "https://api.custom.com/v1",
+  // "apiKey": "your-api-key"
 }`}
       />
     </div>
@@ -204,6 +210,9 @@ export function ProjectModelsSection({ control }: ProjectModelsSectionProps) {
 
           {/* Summarizer Model */}
           <SummarizerModelSection control={control} />
+
+          {/* Provider Configuration Help */}
+          <ProviderConfigHelp />
 
           <div className="text-xs text-muted-foreground p-3 bg-blue-50 dark:bg-blue-950/20 rounded-md border border-blue-200 dark:border-blue-800">
             <p className="font-medium text-blue-900 dark:text-blue-100 mb-2">
