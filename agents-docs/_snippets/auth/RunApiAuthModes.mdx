@@ -1,34 +1,55 @@
 ## Authentication (Run API Modes)
 
-There are three ways to authenticate requests to the Run API. Choose one and follow the header requirements below.
+To start, create an API Key scoped to your graph.
 
-### 1. Standard API Key (Recommended)
+### Create API key
 
-- **What it is:** Per-graph secret created via the Management UI or the Management API
-- **Scope:** Encodes `tenantId`, `projectId`, and `graphId` inside the key
-- **Headers needed:** Only `Authorization: Bearer <key>` (no scope headers)
+Steps in the UI:
+1. Open the Visual Builder Dashboard
+2. Go to your Project → **API Keys**
+3. Click **Create**, select the target agent graph
+4. Copy the API key (it will be shown once) and store it securely
 
-**Create via Management API:**
+<Accordions>
+<Accordion title="Advanced: Global Bypass Secret">
 
-```bash
-# POST /tenants/{tenantId}/crud/projects/{projectId}/api-keys
-curl -X POST "https://<manage-api>/tenants/<tenantId>/crud/projects/<projectId>/api-keys" \
-  -H "Content-Type: application/json" \
-  -d '{ "graphId": "<graph-id>", "expiresAt": null }'
+The global bypass secret allows internal services to authenticate without per-graph API keys.
+
+**Configuration:**
+- Set `INKEEP_AGENTS_RUN_API_BYPASS_SECRET` environment variable on the Run API server
+
+**When to use:**
+- Internal services that need to access multiple graphs
+- Staging/testing environments
+- Automation tools that manage multiple graphs
+
+**Headers required:**
+```http
+Authorization: Bearer <bypass_secret>
+x-inkeep-tenant-id: <tenant-id>
+x-inkeep-project-id: <project-id>
+x-inkeep-graph-id: <graph-id>
 ```
 
-<Note>
-  See [Authentication → Run API](/api-reference/authentication/run-api) for details.
-</Note>
+**Note:** The bypass secret must match the environment variable exactly. All scope headers are required to identify which graph to execute.
 
-### 2. Global Bypass Secret (Infrastructure/Internal Use)
+</Accordion>
 
-- **What it is:** Environment variable set on the Run API server
-- **Configuration:** Set `INKEEP_AGENTS_RUN_API_BYPASS_SECRET` on the server
-- **Headers needed:** Bearer token plus all scope headers: `x-inkeep-tenant-id`, `x-inkeep-project-id`, `x-inkeep-graph-id`
+<Accordion title="Advanced: Development Mode">
 
-### 3. Development Mode
+Development mode disables authentication entirely for local development.
 
-- **When:** `ENVIRONMENT=development` on the Run API server
-- **Authentication:** No API key required
-- **Headers needed:** Scope headers to specify the tenant/project/graph
+**Configuration:**
+- Set `ENVIRONMENT=development` on the Run API server
+
+**Headers required:**
+```http
+x-inkeep-tenant-id: <tenant-id>
+x-inkeep-project-id: <project-id>
+x-inkeep-graph-id: <graph-id>
+```
+
+**Warning:** Never use development mode in production. It bypasses all authentication checks.
+
+</Accordion>
+</Accordions>
