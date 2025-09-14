@@ -1,21 +1,21 @@
 export default {
   docs: [
-    { pages: ['overview', 'quick-start', 'concepts', 'oss-enterprise-comparison'] },
+    { pages: ['overview', 'quick-start', 'concepts'] },
     {
       group: 'Typescript SDK',
       icon: 'LuCode',
       pages: [
-        'typescript-sdk/agent-configuration',
+        'typescript-sdk/agent-settings',
         'typescript-sdk/agent-relationships',
-        'typescript-sdk/external-agent-configuration',
         'typescript-sdk/tools-and-mcp-servers',
         'typescript-sdk/credentials',
-        'typescript-sdk/data-components',
         'typescript-sdk/context-fetchers',
+        'typescript-sdk/request-context',
+        'authentication',
+        'typescript-sdk/data-components',
         'typescript-sdk/artifact-components',
         'typescript-sdk/status-updates',
         'typescript-sdk/cli-reference',
-        'authentication',
         {
           group: 'Observability',
           icon: 'LuChartColumn',
@@ -25,6 +25,7 @@ export default {
             'typescript-sdk/langfuse-usage',
           ],
         },
+        'typescript-sdk/external-agents',
       ],
     },
     {
@@ -34,11 +35,11 @@ export default {
         'visual-builder/graphs',
         'visual-builder/mcp-servers',
         'visual-builder/credentials',
+        'visual-builder/traces',
+        'visual-builder/project-management',
         'visual-builder/data-components',
         'visual-builder/artifact-components',
         'visual-builder/status-components',
-        'visual-builder/traces',
-        'visual-builder/project-management',
       ],
     },
     {
