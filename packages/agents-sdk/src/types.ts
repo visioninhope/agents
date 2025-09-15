@@ -212,11 +212,9 @@ export interface RunResult {
 
 // Graph types
 export interface StatusComponent {
-  id: string;
-  name: string;
   type: string;
   description?: string;
-  schema: {
+  schema?: {
     type: 'object';
     properties: Record<string, any>;
     required?: string[];
@@ -293,6 +291,7 @@ export interface AgentInterface {
   init(): Promise<void>;
   getId(): string;
   getName(): string;
+	getDescription(): string;
   getInstructions(): string;
   getTools(): Record<string, any>;
   getTransfers(): AgentInterface[];
