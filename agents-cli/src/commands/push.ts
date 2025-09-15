@@ -1,10 +1,11 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import type { Project } from '@inkeep/agents-sdk';
 import chalk from 'chalk';
 import ora from 'ora';
-import { importWithTypeScriptSupport } from '../utils/tsx-loader';
-import { findProjectDirectory } from '../utils/project-directory';
 import { loadEnvironmentCredentials } from '../utils/environment-loader';
+import { findProjectDirectory } from '../utils/project-directory';
+import { importWithTypeScriptSupport } from '../utils/tsx-loader';
 
 export interface PushOptions {
   project?: string;
@@ -12,7 +13,6 @@ export interface PushOptions {
   env?: string;
   json?: boolean;
 }
-
 
 /**
  * Load and validate project from index.ts
@@ -32,7 +32,7 @@ async function loadProject(projectDir: string) {
   for (const exportKey of exports) {
     const value = module[exportKey];
     if (value && typeof value === 'object' && value.__type === 'project') {
-      return value;
+      return value as Project;
     }
   }
 
@@ -78,6 +78,10 @@ export async function pushCommand(options: PushOptions) {
     spinner.text = 'Loading project from index.ts...';
     const project = await loadProject(projectDir);
 
+    // const graphs = project.getGraphs();
+    // const agents = graphs.flatMap((graph) => graph.getAgents());
+    // const tools = graphs.flatMap((graph) => graph.getTools());
+
     spinner.succeed('Project loaded successfully');
 
     // Load inkeep.config.ts for configuration
@@ -116,11 +120,11 @@ export async function pushCommand(options: PushOptions) {
     // Load environment credentials if --env flag is provided
     if (options.env && typeof project.setCredentials === 'function') {
       spinner.text = `Loading credentials for environment '${options.env}'...`;
-      
+
       try {
         const credentials = await loadEnvironmentCredentials(projectDir, options.env);
         project.setCredentials(credentials);
-        
+
         spinner.text = 'Project loaded with credentials';
         console.log(chalk.gray(`  • Environment: ${options.env}`));
         console.log(chalk.gray(`  • Credentials loaded: ${Object.keys(credentials).length}`));
@@ -193,19 +197,20 @@ export async function pushCommand(options: PushOptions) {
     console.log(chalk.gray(`  • Graphs: ${stats.graphCount}`));
     console.log(chalk.gray(`  • Tenant: ${stats.tenantId}`));
 
+    // TODO: support toolsCount in graph stats
     // Display graph details if any
-    const graphs = project.getGraphs();
-    if (graphs.length > 0) {
-      console.log(chalk.cyan('\n📊 Graph Details:'));
-      for (const graph of graphs) {
-        const graphStats = graph.getStats();
-        console.log(
-          chalk.gray(
-            `  • ${graph.getName()} (${graph.getId()}): ${graphStats.agentCount} agents, ${graphStats.toolCount} tools`
-          )
-        );
-      }
-    }
+    // const graphs = project.getGraphs();
+    // if (graphs.length > 0) {
+    //   console.log(chalk.cyan('\n📊 Graph Details:'));
+    //   for (const graph of graphs) {
+    //     const graphStats = graph.getStats();
+    //     console.log(
+    //       chalk.gray(
+    //         `  • ${graph.getName()} (${graph.getId()}): ${graphStats.agentCount} agents, ${graphStats.toolCount} tools`
+    //       )
+    //     );
+    //   }
+    // }
 
     // Provide next steps
     console.log(chalk.green('\n✨ Next steps:'));

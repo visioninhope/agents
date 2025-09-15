@@ -57,6 +57,7 @@
     "tsx": "^4.20.5"
   },
   "devDependencies": {
+    "@inkeep/agents-sdk": "workspace:^",
     "@types/fs-extra": "^11.0.4",
     "@types/inquirer": "^9.0.7",
     "@types/node": "^20.10.0",

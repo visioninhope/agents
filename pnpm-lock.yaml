@@ -109,6 +109,9 @@ importers:
         specifier: ^4.1.5
         version: 4.1.8
     devDependencies:
+      '@inkeep/agents-sdk':
+        specifier: workspace:^
+        version: link:../packages/agents-sdk
       '@types/fs-extra':
         specifier: ^11.0.4
         version: 11.0.4
