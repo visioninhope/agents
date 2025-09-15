@@ -219,6 +219,11 @@ app.openapi(chatDataStreamRoute, async (c) => {
     c.header('x-vercel-ai-data-stream', 'v2');
     c.header('x-accel-buffering', 'no'); // disable nginx buffering
 
+    const spanContext = trace.getActiveSpan()?.spanContext();
+    if (spanContext) {
+      c.header('trace-id', spanContext.traceId);
+    }
+
     return stream(c, (stream) =>
       stream.pipe(
         dataStream.pipeThrough(new JsonToSseTransformStream()).pipeThrough(new TextEncoderStream())
