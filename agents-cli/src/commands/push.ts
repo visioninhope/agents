@@ -114,7 +114,11 @@ export async function pushCommand(options: PushOptions) {
 
     // Set configuration on the project
     if (typeof project.setConfig === 'function') {
-      project.setConfig(finalConfig.tenantId, finalConfig.agentsManageApiUrl, finalConfig.modelSettings);
+      project.setConfig(
+        finalConfig.tenantId,
+        finalConfig.agentsManageApiUrl,
+        finalConfig.modelSettings
+      );
     }
 
     // Load environment credentials if --env flag is provided
