@@ -194,6 +194,7 @@ describe('Integration Tests', () => {
       // Create mock StreamHelper
       mockStreamHelper = {
         writeOperation: vi.fn().mockResolvedValue(undefined),
+        writeSummary: vi.fn().mockResolvedValue(undefined),
         writeData: vi.fn().mockResolvedValue(undefined),
         streamText: vi.fn().mockResolvedValue(undefined),
         writeError: vi.fn().mockResolvedValue(undefined),

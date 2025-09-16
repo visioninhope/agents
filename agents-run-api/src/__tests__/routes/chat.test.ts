@@ -108,6 +108,7 @@ vi.mock('../../utils/stream-helpers.js', () => ({
     writeError: vi.fn().mockResolvedValue(undefined),
     writeData: vi.fn().mockResolvedValue(undefined),
     writeOperation: vi.fn().mockResolvedValue(undefined),
+    writeSummary: vi.fn().mockResolvedValue(undefined),
     streamText: vi.fn().mockResolvedValue(undefined),
     streamData: vi.fn().mockResolvedValue(undefined),
   }),

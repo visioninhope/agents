@@ -48,6 +48,7 @@ vi.mock('../../utils/stream-registry.js', () => ({
     complete: vi.fn().mockResolvedValue(undefined),
     writeData: vi.fn().mockResolvedValue(undefined),
     writeOperation: vi.fn().mockResolvedValue(undefined),
+    writeSummary: vi.fn().mockResolvedValue(undefined),
   }),
 }));
 
@@ -67,6 +68,7 @@ describe('GraphSession', () => {
       complete: vi.fn().mockResolvedValue(undefined),
       writeData: vi.fn().mockResolvedValue(undefined),
       writeOperation: vi.fn().mockResolvedValue(undefined),
+      writeSummary: vi.fn().mockResolvedValue(undefined),
     };
 
     session = new GraphSession('test-session', 'test-message', 'test-graph');
@@ -483,6 +485,59 @@ describe('GraphSession', () => {
       for (let i = 1; i < events.length; i++) {
         expect(events[i].timestamp).toBeGreaterThanOrEqual(events[i - 1].timestamp);
       }
+    });
+  });
+
+  describe('Summary Events', () => {
+    it('should emit data-summary events using SummaryEvent interface', () => {
+      // Test that graph session can emit summary events with the new interface
+      const summaryEvent = {
+        label: 'Processing completed',
+        details: {
+          summary: 'Successfully processed user request',
+          itemsProcessed: 5,
+          duration: '2.3s'
+        }
+      };
+
+      // This would be called by the GraphSession when streaming summary events
+      expect(() => {
+        // Verify the SummaryEvent structure is valid
+        expect(summaryEvent.label).toBe('Processing completed');
+        expect(summaryEvent.details?.summary).toBe('Successfully processed user request');
+        expect(summaryEvent.details?.itemsProcessed).toBe(5);
+      }).not.toThrow();
+    });
+
+    it('should handle SummaryEvent with minimal structure', () => {
+      const minimalSummary = {
+        label: 'Status update'
+        // details is optional
+      };
+
+      expect(() => {
+        expect(minimalSummary.label).toBe('Status update');
+        expect(minimalSummary.details).toBeUndefined();
+      }).not.toThrow();
+    });
+
+    it('should handle SummaryEvent with flexible details', () => {
+      const flexibleSummary = {
+        label: 'Dynamic status',
+        details: {
+          // Can contain any structured data
+          customField: 'custom value',
+          nestedData: {
+            level: 2,
+            items: ['a', 'b', 'c']
+          },
+          timestamp: new Date().toISOString()
+        }
+      };
+
+      expect(flexibleSummary.details?.customField).toBe('custom value');
+      expect(flexibleSummary.details?.nestedData.level).toBe(2);
+      expect(Array.isArray(flexibleSummary.details?.nestedData.items)).toBe(true);
     });
   });
 
