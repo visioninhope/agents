@@ -7,4 +7,9 @@ export const myProject = project({
   name: 'My Project',
   description: 'My project',
   graphs: () => [basicGraph, weatherGraph],
+  models: {
+    base: { model: 'anthropic/claude-4-sonnet-20250514' },
+    structuredOutput: { model: 'openai/gpt-4o-mini-2024-07-18' },
+    summarizer: { model: 'openai/gpt-4o-mini-2024-07-18' },
+  },
 });
