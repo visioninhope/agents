@@ -81,7 +81,9 @@ const fetchRandomJoke = functionTool({
   dependencies: { axios: '^1.6.0' },
   execute: async () => {
     const axios = require('axios');
-    const response = await axios.get('https://official-joke-api.appspot.com/random_joke');
+    const response = await axios.get(
+      'https://official-joke-api.appspot.com/jokes/programming/random'
+    );
     return {
       setup: response.data.setup,
       punchline: response.data.punchline,

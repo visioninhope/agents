@@ -631,7 +631,7 @@ export class Agent {
 
       // Import LocalSandboxExecutor dynamically to avoid circular dependencies
       const { LocalSandboxExecutor } = await import('../tools/LocalSandboxExecutor');
-      const sandboxExecutor = new LocalSandboxExecutor();
+      const sandboxExecutor = LocalSandboxExecutor.getInstance();
 
       for (const toolDef of functionToolDefs) {
         if (toolDef.tool.config?.type === 'function') {
