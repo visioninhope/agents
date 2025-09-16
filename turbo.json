@@ -13,7 +13,11 @@
     "ENVIRONMENT",
     "DB_FILE_NAME",
     "PORT",
-    "LOG_LEVEL"
+    "LOG_LEVEL",
+    "INKEEP_AGENTS_MANAGE_API_BYPASS_SECRET",
+    "NANGO_SECRET_KEY",
+    "NANGO_HOST",
+    "SIGNOZ_API_KEY"
   ],
   "tasks": {
     "sync:licenses": {
