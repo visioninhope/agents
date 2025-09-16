@@ -12,7 +12,7 @@ export interface FunctionToolConfig {
   dependencies: Record<string, string>;
   sandboxConfig?: {
     provider: 'vercel' | 'daytona' | 'local';
-    runtime: 'node22' | 'python3.13' | 'typescript';
+    runtime: 'node22' | 'typescript';
     timeout?: number;
     vcpus?: number;
   };

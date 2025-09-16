@@ -147,7 +147,7 @@ export interface FunctionToolConfig {
   execute: (params: any) => Promise<any>;
   sandboxConfig?: {
     provider: 'vercel' | 'daytona' | 'local';
-    runtime: 'node22' | 'python3.13' | 'typescript';
+    runtime: 'node22' | 'typescript';
     timeout?: number;
     vcpus?: number;
   };

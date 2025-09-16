@@ -526,7 +526,7 @@ export const FunctionToolConfigSchema = z.object({
     sandboxConfig: z
       .object({
         provider: z.enum(['vercel', 'daytona', 'local']).optional(),
-        runtime: z.enum(['node22', 'python3.13', 'typescript']).optional(),
+        runtime: z.enum(['node22', 'typescript']).optional(),
         timeout: z.number().optional(),
         vcpus: z.number().optional(),
       })
