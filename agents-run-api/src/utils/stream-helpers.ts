@@ -1,3 +1,4 @@
+import type { SummaryEvent } from '@inkeep/agents-core';
 import { parsePartialJson } from 'ai';
 import type { OperationEvent } from './agent-operations';
 
@@ -12,6 +13,7 @@ export interface StreamHelper {
   writeData(type: string, data: any): Promise<void>;
   // Operation streaming (operations are defined in agent-operations.ts)
   writeOperation(operation: OperationEvent): Promise<void>;
+  writeSummary(summary: SummaryEvent): Promise<void>;
 }
 
 // Define the stream type based on Hono's streamSSE callback parameter
@@ -38,7 +40,7 @@ export interface ChatCompletionChunk {
 export class SSEStreamHelper implements StreamHelper {
   // Stream queuing for proper event ordering
   private isTextStreaming: boolean = false;
-  private queuedOperations: OperationEvent[] = [];
+  private queuedEvents: { type: string; event: OperationEvent | SummaryEvent }[] = [];
 
   constructor(
     private stream: HonoSSEStream,
@@ -146,26 +148,6 @@ export class SSEStreamHelper implements StreamHelper {
     });
   }
 
-  /**
-   * Write the final [DONE] message
-   */
-  async writeDone(): Promise<void> {
-    await this.stream.writeSSE({
-      data: '[DONE]',
-    });
-  }
-
-  /**
-   * Complete the stream with finish reason and done message
-   */
-  async complete(finishReason = 'stop'): Promise<void> {
-    // Flush any remaining queued operations before completing
-    await this.flushQueuedOperations();
-
-    await this.writeCompletion(finishReason);
-    await this.writeDone();
-  }
-
   async writeData(type: string, data: any): Promise<void> {
     await this.stream.writeSSE({
       data: JSON.stringify({
@@ -185,18 +167,28 @@ export class SSEStreamHelper implements StreamHelper {
     });
   }
 
-  async writeOperation(operation: OperationEvent): Promise<void> {
-    if (operation.type === 'status_update' && operation.ctx.label) {
-      operation = {
-        type: operation.type,
-        label: operation.ctx.label,
-        ctx: operation.ctx.data,
-      };
-    }
-
+  async writeSummary(summary: SummaryEvent): Promise<void> {
     // Queue operation if text is currently streaming
     if (this.isTextStreaming) {
-      this.queuedOperations.push(operation);
+      this.queuedEvents.push({
+        type: 'data-summary',
+        event: summary,
+      });
+      return;
+    }
+
+    // If not streaming, flush any queued operations first, then send this one
+    await this.flushQueuedOperations();
+    await this.writeData('data-summary', summary);
+  }
+
+  async writeOperation(operation: OperationEvent): Promise<void> {
+    // Queue operation if text is currently streaming
+    if (this.isTextStreaming) {
+      this.queuedEvents.push({
+        type: 'data-operation',
+        event: operation,
+      });
       return;
     }
 
@@ -210,16 +202,36 @@ export class SSEStreamHelper implements StreamHelper {
    * Flush all queued operations in order after text streaming completes
    */
   private async flushQueuedOperations(): Promise<void> {
-    if (this.queuedOperations.length === 0) {
+    if (this.queuedEvents.length === 0) {
       return;
     }
 
-    const operationsToFlush = [...this.queuedOperations];
-    this.queuedOperations = []; // Clear the queue
+    const eventsToFlush = [...this.queuedEvents];
+    this.queuedEvents = []; // Clear the queue
 
-    for (const operation of operationsToFlush) {
-      await this.writeData('data-operation', operation);
+    for (const event of eventsToFlush) {
+      await this.writeData(event.type, event.event);
     }
+  }
+
+  /**
+   * Write the final [DONE] message
+   */
+  async writeDone(): Promise<void> {
+    await this.stream.writeSSE({
+      data: '[DONE]',
+    });
+  }
+
+  /**
+   * Complete the stream with finish reason and done message
+   */
+  async complete(finishReason = 'stop'): Promise<void> {
+    // Flush any remaining queued operations before completing
+    await this.flushQueuedOperations();
+
+    await this.writeCompletion(finishReason);
+    await this.writeDone();
   }
 }
 
@@ -254,7 +266,7 @@ export class VercelDataStreamHelper implements StreamHelper {
 
   // Stream queuing for proper event ordering
   private isTextStreaming: boolean = false;
-  private queuedOperations: OperationEvent[] = [];
+  private queuedEvents: { type: string; event: OperationEvent | SummaryEvent }[] = [];
 
   // Timing tracking for text sequences (text-end to text-start gap)
   private lastTextEndTimestamp: number = 0;
@@ -459,31 +471,6 @@ export class VercelDataStreamHelper implements StreamHelper {
     this.writer.merge(stream);
   }
 
-  async writeCompletion(_finishReason = 'stop'): Promise<void> {
-    // Completion is handled automatically by Vercel's writer
-  }
-
-  async writeDone(): Promise<void> {
-    // Done is handled automatically by Vercel's writer
-  }
-
-  /**
-   * Complete the stream and clean up all memory
-   * This is the primary cleanup point to prevent memory leaks between requests
-   */
-  async complete(): Promise<void> {
-    if (this.isCompleted) return;
-
-    // Flush any remaining queued operations before completing
-    await this.flushQueuedOperations();
-
-    // Mark as completed to prevent further writes
-    this.isCompleted = true;
-
-    // Clean up all buffers and references
-    this.cleanup();
-  }
-
   /**
    * Clean up all memory allocations
    * Should be called when the stream helper is no longer needed
@@ -499,7 +486,7 @@ export class VercelDataStreamHelper implements StreamHelper {
     this.sentItems.clear();
     this.completedItems.clear();
     this.textId = null;
-    this.queuedOperations = [];
+    this.queuedEvents = [];
     this.isTextStreaming = false;
   }
 
@@ -618,18 +605,10 @@ export class VercelDataStreamHelper implements StreamHelper {
     };
   }
 
-  async writeOperation(operation: OperationEvent): Promise<void> {
+  async writeSummary(summary: SummaryEvent): Promise<void> {
     if (this.isCompleted) {
-      console.warn('Attempted to write operation to completed stream');
+      console.warn('Attempted to write summary to completed stream');
       return;
-    }
-
-    if (operation.type === 'status_update' && operation.ctx.label) {
-      operation = {
-        type: operation.type,
-        label: operation.ctx.label, // Preserve the label for the UI
-        ctx: operation.ctx.data,
-      };
     }
 
     // Check timing gap from last text-end
@@ -641,7 +620,36 @@ export class VercelDataStreamHelper implements StreamHelper {
     // 1. Text is currently streaming, OR
     // 2. We're within the gap threshold from last text-end (more text might be coming)
     if (this.isTextStreaming || gapFromLastTextEnd < this.TEXT_GAP_THRESHOLD) {
-      this.queuedOperations.push(operation);
+      this.queuedEvents.push({ type: 'data-summary', event: summary });
+      return;
+    }
+
+    // If not streaming, flush any queued operations first, then send this one
+    await this.flushQueuedOperations();
+
+    await this.writer.write({
+      id: 'id' in summary ? summary.id : undefined,
+      type: 'data-summary',
+      data: summary,
+    });
+  }
+
+  async writeOperation(operation: OperationEvent): Promise<void> {
+    if (this.isCompleted) {
+      console.warn('Attempted to write operation to completed stream');
+      return;
+    }
+
+    // Check timing gap from last text-end
+    const now = Date.now();
+    const gapFromLastTextEnd =
+      this.lastTextEndTimestamp > 0 ? now - this.lastTextEndTimestamp : Number.MAX_SAFE_INTEGER;
+
+    // ALWAYS queue operation if:
+    // 1. Text is currently streaming, OR
+    // 2. We're within the gap threshold from last text-end (more text might be coming)
+    if (this.isTextStreaming || gapFromLastTextEnd < this.TEXT_GAP_THRESHOLD) {
+      this.queuedEvents.push({ type: 'data-operation', event: operation });
       return;
     }
 
@@ -659,20 +667,45 @@ export class VercelDataStreamHelper implements StreamHelper {
    * Flush all queued operations in order after text streaming completes
    */
   private async flushQueuedOperations(): Promise<void> {
-    if (this.queuedOperations.length === 0) {
+    if (this.queuedEvents.length === 0) {
       return;
     }
 
-    const operationsToFlush = [...this.queuedOperations];
-    this.queuedOperations = []; // Clear the queue
+    const eventsToFlush = [...this.queuedEvents];
+    this.queuedEvents = []; // Clear the queue
 
-    for (const operation of operationsToFlush) {
+    for (const event of eventsToFlush) {
       this.writer.write({
-        id: 'id' in operation ? operation.id : undefined,
-        type: 'data-operation',
-        data: operation,
+        id: 'id' in event.event ? event.event.id : undefined,
+        type: event.type,
+        data: event.event,
       });
     }
+  }
+
+  async writeCompletion(_finishReason = 'stop'): Promise<void> {
+    // Completion is handled automatically by Vercel's writer
+  }
+
+  async writeDone(): Promise<void> {
+    // Done is handled automatically by Vercel's writer
+  }
+
+  /**
+   * Complete the stream and clean up all memory
+   * This is the primary cleanup point to prevent memory leaks between requests
+   */
+  async complete(): Promise<void> {
+    if (this.isCompleted) return;
+
+    // Flush any remaining queued operations before completing
+    await this.flushQueuedOperations();
+
+    // Mark as completed to prevent further writes
+    this.isCompleted = true;
+
+    // Clean up all buffers and references
+    this.cleanup();
   }
 }
 
@@ -688,6 +721,7 @@ export class MCPStreamHelper implements StreamHelper {
   private capturedText = '';
   private capturedData: any[] = [];
   private capturedOperations: OperationEvent[] = [];
+  private capturedSummaries: SummaryEvent[] = [];
   private hasError = false;
   private errorMessage = '';
   private sessionId?: string;
@@ -713,8 +747,24 @@ export class MCPStreamHelper implements StreamHelper {
     this.capturedData.push(data);
   }
 
+  async streamSummary(summary: SummaryEvent): Promise<void> {
+    this.capturedSummaries.push(summary);
+  }
+
+  async streamOperation(operation: OperationEvent): Promise<void> {
+    this.capturedOperations.push(operation);
+  }
+
   async writeData(_type: string, data: any): Promise<void> {
     this.capturedData.push(data);
+  }
+
+  async writeSummary(summary: SummaryEvent): Promise<void> {
+    this.capturedSummaries.push(summary);
+  }
+
+  async writeOperation(operation: OperationEvent): Promise<void> {
+    this.capturedOperations.push(operation);
   }
 
   async writeError(errorMessage: string): Promise<void> {
@@ -724,10 +774,6 @@ export class MCPStreamHelper implements StreamHelper {
 
   async complete(): Promise<void> {
     // No-op for MCP
-  }
-
-  async writeOperation(operation: OperationEvent): Promise<void> {
-    this.capturedOperations.push(operation);
   }
 
   /**

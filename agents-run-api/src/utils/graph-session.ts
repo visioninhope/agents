@@ -3,6 +3,7 @@ import type {
   ModelSettings,
   StatusComponent,
   StatusUpdateSettings,
+  SummaryEvent,
 } from '@inkeep/agents-core';
 import { SpanStatusCode } from '@opentelemetry/api';
 import { generateObject, generateText } from 'ai';
@@ -11,9 +12,8 @@ import { ModelFactory } from '../agents/ModelFactory';
 import { getFormattedConversationHistory } from '../data/conversations';
 import dbClient from '../data/db/dbClient';
 import { getLogger } from '../logger';
-import { tracer, setSpanWithError } from './tracer';
-import { statusUpdateOp } from './agent-operations';
 import { getStreamHelper } from './stream-registry';
+import { setSpanWithError, tracer } from './tracer';
 
 const logger = getLogger('GraphSession');
 
@@ -516,7 +516,7 @@ export class GraphSession {
       const elapsedTime = now - statusUpdateState.startTime;
 
       // Generate status update - either structured or text summary
-      let operation: any;
+      let summaryToSend: any;
 
       if (
         statusUpdateState.config.statusComponents &&
@@ -531,38 +531,40 @@ export class GraphSession {
           this.previousSummaries
         );
 
-        if (result.operations && result.operations.length > 0) {
+        if (result.summaries && result.summaries.length > 0) {
           // Send each operation separately using writeData for dynamic types
-          for (const op of result.operations) {
+          for (const summary of result.summaries) {
             // Guard against empty/invalid operations
-            if (!op || !op.type || !op.data || Object.keys(op.data).length === 0) {
+            if (
+              !summary ||
+              !summary.type ||
+              !summary.data ||
+              !summary.data.label ||
+              Object.keys(summary.data).length === 0
+            ) {
               logger.warn(
                 {
                   sessionId: this.sessionId,
-                  operation: op,
+                  summary: summary,
                 },
                 'Skipping empty or invalid structured operation'
               );
               continue;
             }
 
-            const operationToSend = {
-              type: 'status_update' as const,
-              ctx: {
-                operationType: op.type,
-                label: op.data.label,
-                data: Object.fromEntries(
-                  Object.entries(op.data).filter(([key]) => !['label', 'type'].includes(key))
-                ),
-              },
+            const summaryToSend = {
+              label: summary.data.label,
+              data: Object.fromEntries(
+                Object.entries(summary.data).filter(([key]) => !['label', 'type'].includes(key))
+              ),
             };
 
-            await streamHelper.writeOperation(operationToSend);
+            await streamHelper.writeSummary(summaryToSend as SummaryEvent);
           }
 
           // Store summaries for next time - use full JSON for better comparison
-          const summaryTexts = result.operations.map((op) =>
-            JSON.stringify({ type: op.type, data: op.data })
+          const summaryTexts = result.summaries.map((summary) =>
+            JSON.stringify({ type: summary.type, data: summary.data })
           );
           this.previousSummaries.push(...summaryTexts);
 
@@ -589,15 +591,9 @@ export class GraphSession {
         this.previousSummaries.push(summary);
 
         // Create standard status update operation
-        operation = statusUpdateOp({
-          summary,
-          eventCount: this.events.length,
-          elapsedTime,
-          currentPhase: 'processing',
-          activeAgent: 'system',
-          graphId,
-          sessionId: this.sessionId,
-        });
+        const summaryToSend = {
+          label: summary,
+        };
       }
 
       // Keep only last 3 summaries to avoid context getting too large
@@ -606,18 +602,18 @@ export class GraphSession {
       }
 
       // Guard against sending empty/undefined operations that break streams
-      if (!operation || !operation.type || !operation.ctx) {
+      if (!summaryToSend || !summaryToSend.label) {
         logger.warn(
           {
             sessionId: this.sessionId,
-            operation,
+            summaryToSend,
           },
           'Skipping empty or invalid status update operation'
         );
         return;
       }
 
-      await streamHelper.writeOperation(operation);
+      await streamHelper.writeSummary(summaryToSend);
 
       // Update state - check if still exists (could be cleaned up during async operation)
       if (this.statusUpdateState) {
@@ -846,7 +842,7 @@ ${this.statusUpdateState?.config.prompt?.trim() || ''}`;
     statusComponents: StatusComponent[],
     summarizerModel?: ModelSettings,
     previousSummaries: string[] = []
-  ): Promise<{ operations: Array<{ type: string; data: Record<string, any> }> }> {
+  ): Promise<{ summaries: Array<{ type: string; data: Record<string, any> }> }> {
     return tracer.startActiveSpan(
       'graph_session.generate_structured_update',
       {
@@ -977,7 +973,7 @@ ${this.statusUpdateState?.config.prompt?.trim() || ''}`;
           const result = object as any;
 
           // Extract components that have data (skip no_relevant_updates and empty components)
-          const operations = [];
+          const summaries = [];
           for (const [componentId, data] of Object.entries(result)) {
             // Skip no_relevant_updates - we don't send any operation for this
             if (componentId === 'no_relevant_updates') {
@@ -986,7 +982,7 @@ ${this.statusUpdateState?.config.prompt?.trim() || ''}`;
 
             // Only include components that have actual data
             if (data && typeof data === 'object' && Object.keys(data).length > 0) {
-              operations.push({
+              summaries.push({
                 type: componentId,
                 data: data,
               });
@@ -994,17 +990,17 @@ ${this.statusUpdateState?.config.prompt?.trim() || ''}`;
           }
 
           span.setAttributes({
-            'operations.count': operations.length,
+            'summaries.count': summaries.length,
             'user_activities.count': userVisibleActivities.length,
             'result_keys.count': Object.keys(result).length,
           });
           span.setStatus({ code: SpanStatusCode.OK });
 
-          return { operations };
+          return { summaries };
         } catch (error) {
           setSpanWithError(span, error);
           logger.error({ error }, 'Failed to generate structured update, using fallback');
-          return { operations: [] };
+          return { summaries: [] };
         } finally {
           span.end();
         }

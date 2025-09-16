@@ -328,3 +328,12 @@ export type ProjectApiUpdate = z.infer<typeof ProjectApiUpdateSchema>;
 
 // === Pagination Types ===
 export type Pagination = z.infer<typeof PaginationSchema>;
+
+// === Summary Event Types ===
+export interface SummaryEvent {
+  label: string; // LLM-generated label for the UI
+  details?: {
+    summary?: string; // Unstructured summary text
+    [key: string]: any; // Structured data from graph session
+  };
+}

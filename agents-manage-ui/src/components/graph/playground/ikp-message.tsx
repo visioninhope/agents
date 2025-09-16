@@ -1,6 +1,6 @@
 import type { Message } from '@inkeep/cxkit-react-oss/types';
 import { BookOpen, Check, ChevronRight, LoaderCircle } from 'lucide-react';
-import { type FC, useEffect, useState, useRef } from 'react';
+import { type FC, useEffect, useRef, useState } from 'react';
 import supersub from 'remark-supersub';
 import { Streamdown } from 'streamdown';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -57,28 +57,27 @@ const CitationBadge: FC<{
   );
 };
 
-// Inline Data Operation Component
-const InlineDataOperation: FC<{ operation: any; isLast: boolean }> = ({ operation, isLast }) => {
+// Shared inline event component
+const InlineEvent: FC<{ operation: any; isLast: boolean }> = ({ operation, isLast }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const { type, ctx } = operation;
-
-  const getOperationLabel = () => {
-    // Use LLM-generated label if available (for status updates and other operations)
-    if (operation.label) {
+  
+  const getLabel = () => {
+    if (operation.type === 'data-summary') {
+      // data-summary always has operation.label
       return operation.label;
+    } else {
+      // data-operation might need fallback
+      return getOperationLabel(operation);
     }
+  };
 
-    switch (type) {
-      case 'agent_initializing':
-        return 'Agent initializing';
-      case 'agent_ready':
-        return 'Agent ready';
-      case 'completion':
-        return 'Completion';
-      case 'status_update':
-        return 'Status update';
-      default:
-        return type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+  const getExpandedContent = () => {
+    if (operation.type === 'data-summary') {
+      // data-summary uses details
+      return operation.details || {};
+    } else {
+      // data-operation uses ctx
+      return operation.ctx || {};
     }
   };
 
@@ -94,7 +93,7 @@ const InlineDataOperation: FC<{ operation: any; isLast: boolean }> = ({ operatio
         className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors cursor-pointer ml-[5px]"
       >
         <span className="w-1 h-1 bg-gray-400 rounded-full" />
-        <span className="font-medium ml-3">{getOperationLabel()}</span>
+        <span className="font-medium ml-3">{getLabel()}</span>
         <ChevronRight
           className={cn(
             'w-3 h-3 transition-transform duration-200',
@@ -106,12 +105,32 @@ const InlineDataOperation: FC<{ operation: any; isLast: boolean }> = ({ operatio
       {isExpanded && (
         <div className=" ml-6 pb-2 mt-2 rounded text-xs">
           <pre className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap font-mono">
-            {JSON.stringify(ctx, null, 2)}
+            {JSON.stringify(getExpandedContent(), null, 2)}
           </pre>
         </div>
       )}
     </div>
   );
+};
+
+// Helper function for data-operation labels
+const getOperationLabel = (operation: any) => {
+  // Use LLM-generated label if available for data-operations
+  if (operation.label) {
+    return operation.label;
+  }
+
+  const { type } = operation;
+  switch (type) {
+    case 'agent_initializing':
+      return 'Agent initializing';
+    case 'agent_ready':
+      return 'Agent ready';
+    case 'completion':
+      return 'Completion';
+    default:
+      return type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+  }
 };
 
 // StreamMarkdown component that renders with inline citations and data operations
@@ -146,6 +165,15 @@ function StreamMarkdown({ parts }: { parts: any[] }) {
           // Add the inline operation
           processed.push({ type: 'inline-operation', operation: part.data });
         }
+      } else if (part.type === 'data-summary') {
+        // Handle data-summary events as inline operations
+        // If we have accumulated text, add it first
+        if (currentTextChunk.trim()) {
+          processed.push({ type: 'text', content: currentTextChunk });
+          currentTextChunk = '';
+        }
+        // Add the inline summary
+        processed.push({ type: 'inline-operation', operation: { type: 'data-summary', ...part.data } });
       } else if (part.type === 'data-artifact') {
         // Add artifact as citation marker inline with current text (don't flush)
         const artifactData = part.data as any;
@@ -220,7 +248,7 @@ function StreamMarkdown({ parts }: { parts: any[] }) {
         } else if (part.type === 'inline-operation') {
           const isLast = inlineOpIndex === inlineOperations.length - 1;
           inlineOpIndex++;
-          return <InlineDataOperation key={index} operation={part.operation} isLast={isLast} />;
+          return <InlineEvent key={index} operation={part.operation} isLast={isLast} />;
         }
         return null;
       })}

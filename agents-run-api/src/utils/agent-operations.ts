@@ -59,18 +59,6 @@ export interface AgentThinkingEvent {
 }
 
 /**
- * Status update operation event with flexible structured/unstructured data
- */
-export interface StatusUpdateEvent {
-  type: 'status_update';
-  label?: string; // LLM-generated label for the UI
-  ctx: {
-    summary?: string; // Unstructured summary text
-    [key: string]: any; // Structured data from graph session
-  };
-}
-
-/**
  * Discriminated union of all operation events
  */
 export type OperationEvent =
@@ -78,8 +66,7 @@ export type OperationEvent =
   | AgentReadyEvent
   | AgentThinkingEvent
   | CompletionEvent
-  | ErrorEvent
-  | StatusUpdateEvent;
+  | ErrorEvent;
 
 // =============================================================================
 // OPERATION FUNCTIONS
@@ -156,12 +143,3 @@ export function generateToolId(): string {
   return `tool_${nanoid(8)}`;
 }
 
-/**
- * Creates a status update operation with flexible data
- */
-export function statusUpdateOp(ctx: Record<string, any>): StatusUpdateEvent {
-  return {
-    type: 'status_update',
-    ctx,
-  };
-}
