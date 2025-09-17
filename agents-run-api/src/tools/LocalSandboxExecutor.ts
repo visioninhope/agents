@@ -304,7 +304,7 @@ export class LocalSandboxExecutor {
       const moduleType = this.detectModuleType(config.executeCode);
 
       // Create the function execution file with appropriate extension
-      const executionCode = this.wrapFunctionCode(config.executeCode, args, moduleType);
+      const executionCode = this.wrapFunctionCode(config.executeCode, args);
       const fileExtension = moduleType === 'esm' ? 'mjs' : 'js';
       writeFileSync(join(sandboxDir, `index.${fileExtension}`), executionCode, 'utf8');
 
@@ -460,9 +460,8 @@ export class LocalSandboxExecutor {
     });
   }
 
-  private wrapFunctionCode(executeCode: string, args: any, moduleType: 'cjs' | 'esm'): string {
-    if (moduleType === 'esm') {
-      return `
+  private wrapFunctionCode(executeCode: string, args: any): string {
+    return `
 // Wrapped function execution (ESM)
 const execute = ${executeCode};
 const args = ${JSON.stringify(args)};
@@ -475,20 +474,5 @@ execute(args)
     console.log(JSON.stringify({ success: false, error: error.message }));
   });
 `;
-    } else {
-      return `
-// Wrapped function execution (CommonJS)
-const execute = ${executeCode};
-const args = ${JSON.stringify(args)};
-
-execute(args)
-  .then(result => {
-    console.log(JSON.stringify({ success: true, result }));
-  })
-  .catch(error => {
-    console.log(JSON.stringify({ success: false, error: error.message }));
-  });
-`;
-    }
   }
 }
