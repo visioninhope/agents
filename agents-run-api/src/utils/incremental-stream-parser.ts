@@ -22,6 +22,8 @@ export class IncrementalStreamParser {
   private collectedParts: StreamPart[] = [];
   private contextId: string;
   private lastChunkWasToolResult = false;
+  private componentAccumulator: any = {};
+  private lastStreamedComponents = new Map<string, any>();
 
   constructor(streamHelper: StreamHelper, tenantId: string, contextId: string) {
     this.streamHelper = streamHelper;
@@ -59,141 +61,96 @@ export class IncrementalStreamParser {
     this.buffer = parseResult.remainingBuffer;
   }
 
+
   /**
-   * Process a new object chunk for object streaming (handles JSON objects with artifact references)
+   * Process object deltas directly from Vercel AI SDK's fullStream
+   * Accumulates components until they're complete before streaming
    */
-  async processObjectChunk(chunk: string): Promise<void> {
-    this.buffer += chunk;
-
-    const parseResult = await this.parseObjectBuffer();
-
-    // Stream complete parts
-    for (const part of parseResult.completeParts) {
-      await this.streamPart(part);
+  async processObjectDelta(delta: any): Promise<void> {
+    if (!delta || typeof delta !== 'object') {
+      return;
     }
 
-    // Update buffer with remaining content
-    this.buffer = parseResult.remainingBuffer;
-  }
+    // Deep merge delta into accumulator
+    this.componentAccumulator = this.deepMerge(this.componentAccumulator, delta);
 
-  /**
-   * Process tool call stream for structured output, streaming components as they complete
-   */
-  async processToolCallStream(stream: AsyncIterable<any>, targetToolName: string): Promise<void> {
-    let jsonBuffer = '';
-    let componentBuffer = '';
-    let depth = 0;
-    let _inDataComponents = false;
-    let componentsStreamed = 0;
-
-    const MAX_BUFFER_SIZE = 5 * 1024 * 1024; // 5MB max buffer size
-
-    for await (const part of stream) {
-      // Look for tool call deltas with incremental JSON
-      if (part.type === 'tool-call-delta' && part.toolName === targetToolName) {
-        const delta = part.argsTextDelta || '';
-
-        // Prevent JSON buffer from growing too large
-        if (jsonBuffer.length + delta.length > MAX_BUFFER_SIZE) {
-          logger.warn(
-            { bufferSize: jsonBuffer.length + delta.length, maxSize: MAX_BUFFER_SIZE },
-            'JSON buffer exceeded maximum size, truncating'
-          );
-          jsonBuffer = jsonBuffer.slice(-MAX_BUFFER_SIZE / 2); // Keep last half
-        }
-
-        jsonBuffer += delta;
-
-        // Parse character by character to detect complete components
-        for (const char of delta) {
-          // Prevent component buffer from growing too large
-          if (componentBuffer.length > MAX_BUFFER_SIZE) {
-            logger.warn(
-              { bufferSize: componentBuffer.length, maxSize: MAX_BUFFER_SIZE },
-              'Component buffer exceeded maximum size, resetting'
-            );
-            componentBuffer = '';
-            depth = 0; // Reset depth tracking
-            continue;
-          }
-
-          componentBuffer += char;
-
-          // Track JSON depth
-          if (char === '{') {
-            depth++;
-          } else if (char === '}') {
-            depth--;
-
-            // At depth 2, we're inside the dataComponents array
-            // When we return to depth 2, we have a complete component
-            if (depth === 2 && componentBuffer.includes('"id"')) {
-              // Extract just the component object with size limit
-              const componentMatch = componentBuffer.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
-              if (componentMatch) {
-                // Size limit check - prevent parsing extremely large JSON objects
-                const MAX_COMPONENT_SIZE = 1024 * 1024; // 1MB limit per component
-                if (componentMatch[0].length > MAX_COMPONENT_SIZE) {
-                  logger.warn(
-                    {
-                      size: componentMatch[0].length,
-                      maxSize: MAX_COMPONENT_SIZE,
-                    },
-                    'Component exceeds size limit, skipping'
-                  );
-                  componentBuffer = ''; // Reset and skip this component
-                  continue;
-                }
-
-                try {
-                  const component = JSON.parse(componentMatch[0]);
-
-                  // Validate component structure before processing
-                  if (typeof component !== 'object' || !component.id) {
-                    logger.warn({ component }, 'Invalid component structure, skipping');
-                    componentBuffer = '';
-                    continue;
-                  }
-
-                  // Stream this individual component
-                  const parts = await this.artifactParser.parseObject({
-                    dataComponents: [component],
-                  });
-                  for (const part of parts) {
-                    await this.streamPart(part);
-                  }
-
-                  componentsStreamed++;
-                  componentBuffer = ''; // Reset for next component
-                } catch (e) {
-                  // Not valid JSON yet, keep accumulating
-                  logger.debug({ error: e }, 'Failed to parse component, continuing to accumulate');
-                }
-              }
-            }
-          }
-
-          // Detect when we enter dataComponents array
-          if (componentBuffer.includes('"dataComponents"') && componentBuffer.includes('[')) {
-            _inDataComponents = true;
-          }
-        }
-      }
-      // Alternative: if the SDK provides complete tool calls (not deltas)
-      else if (part.type === 'tool-call' && part.toolName === targetToolName) {
-        // Process the complete args at once
-        if (part.args?.dataComponents) {
-          const parts = await this.artifactParser.parseObject(part.args);
+    // Check if we have dataComponents to process
+    if (this.componentAccumulator.dataComponents && Array.isArray(this.componentAccumulator.dataComponents)) {
+      const components = this.componentAccumulator.dataComponents;
+      
+      for (let i = 0; i < components.length; i++) {
+        const component = components[i];
+        
+        const componentKey = component.id;
+        const hasBeenStreamed = this.lastStreamedComponents.has(componentKey);
+        
+        // Stream this component if it's complete and we haven't streamed it yet
+        if (this.isComponentComplete(component) && !hasBeenStreamed) {
+          // Stream this complete component
+          const parts = await this.artifactParser.parseObject({
+            dataComponents: [component],
+          });
+          
           for (const part of parts) {
             await this.streamPart(part);
           }
+          
+          // Mark as streamed
+          this.lastStreamedComponents.set(componentKey, true);
         }
-        break; // Tool call complete
       }
     }
-
-    logger.debug({ componentsStreamed }, 'Finished streaming components');
   }
+
+  /**
+   * Check if a component is complete enough to stream
+   * Components need id, name, and props to be considered complete
+   */
+  private isComponentComplete(component: any): boolean {
+    if (!component || !component.id || !component.name) {
+      return false;
+    }
+
+    // Must have props object
+    if (!component.props || typeof component.props !== 'object') {
+      return false;
+    }
+
+    // For artifacts, check if we have both required fields
+    const isArtifact = component.name === 'Artifact' || 
+                      (component.props.artifact_id && component.props.task_id);
+    
+    if (isArtifact) {
+      // Artifacts must have both artifact_id and task_id
+      return Boolean(component.props.artifact_id && component.props.task_id);
+    }
+
+    // For regular components, check if props has meaningful content
+    // Could be customized based on your component schemas
+    const propKeys = Object.keys(component.props);
+    return propKeys.length > 0 && propKeys.some(key => component.props[key] !== null && component.props[key] !== undefined && component.props[key] !== '');
+  }
+
+  /**
+   * Deep merge helper for object deltas
+   */
+  private deepMerge(target: any, source: any): any {
+    if (!source) return target;
+    if (!target) return source;
+
+    const result = { ...target };
+    
+    for (const key in source) {
+      if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+        result[key] = this.deepMerge(target[key], source[key]);
+      } else {
+        result[key] = source[key];
+      }
+    }
+    
+    return result;
+  }
+
 
   /**
    * Legacy method for backward compatibility - defaults to text processing
@@ -299,36 +256,6 @@ export class IncrementalStreamParser {
     };
   }
 
-  /**
-   * Parse buffer for complete JSON objects with artifact references (for object streaming)
-   */
-  private async parseObjectBuffer(): Promise<ParseResult> {
-    const completeParts: StreamPart[] = [];
-
-    try {
-      // Try to parse as complete JSON
-      const parsed = JSON.parse(this.buffer);
-      const parts = await this.artifactParser.parseObject(parsed);
-
-      return {
-        completeParts: parts,
-        remainingBuffer: '',
-      };
-    } catch {
-      // JSON is incomplete, try partial parsing
-      const { complete, remaining } = this.artifactParser.parsePartialJSON(this.buffer);
-
-      for (const obj of complete) {
-        const parts = await this.artifactParser.parseObject(obj);
-        completeParts.push(...parts);
-      }
-
-      return {
-        completeParts,
-        remainingBuffer: remaining,
-      };
-    }
-  }
 
   /**
    * Check if text might be the start of an artifact marker
