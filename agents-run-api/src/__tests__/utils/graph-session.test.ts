@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { StatusUpdateSettings } from '../../builder/types';
+import type { ModelSettings, StatusUpdateSettings } from '../../builder/types';
 import { GraphSession, graphSessionManager } from '../../utils/graph-session';
 import type { StreamHelper } from '../../utils/stream-helpers';
 
@@ -70,6 +70,10 @@ describe('GraphSession', () => {
       writeOperation: vi.fn().mockResolvedValue(undefined),
       writeSummary: vi.fn().mockResolvedValue(undefined),
     };
+
+    // Mock getStreamHelper to return our mockStreamHelper
+    const { getStreamHelper } = require('../../utils/stream-registry');
+    vi.mocked(getStreamHelper).mockReturnValue(mockStreamHelper);
 
     session = new GraphSession('test-session', 'test-message', 'test-graph');
   });
@@ -232,7 +236,7 @@ describe('GraphSession', () => {
         model: 'claude-3-5-haiku-20241022',
       };
 
-      session.initializeStatusUpdates(config, 'claude-3-5-haiku-20241022');
+      session.initializeStatusUpdates(config, { model: 'claude-3-5-haiku-20241022' });
 
       // Add events to trigger status update
       session.recordEvent('tool_execution', 'agent-1', {
@@ -263,7 +267,7 @@ describe('GraphSession', () => {
         model: 'claude-3-5-haiku-20241022',
       };
 
-      session.initializeStatusUpdates(config, 'claude-3-5-haiku-20241022');
+      session.initializeStatusUpdates(config, { model: 'claude-3-5-haiku-20241022' });
 
       // Time-based updates should not trigger immediately
       expect(mockStreamHelper.writeOperation).not.toHaveBeenCalled();
@@ -275,7 +279,7 @@ describe('GraphSession', () => {
         numEvents: 5,
       };
 
-      session.initializeStatusUpdates(config, 'claude-3-5-haiku-20241022');
+      session.initializeStatusUpdates(config, { model: 'claude-3-5-haiku-20241022' });
 
       // Add events
       session.recordEvent('tool_execution', 'agent-1', {
@@ -295,7 +299,7 @@ describe('GraphSession', () => {
         model: 'claude-3-5-haiku-20241022',
       };
 
-      session.initializeStatusUpdates(config, 'claude-3-5-haiku-20241022');
+      session.initializeStatusUpdates(config, { model: 'claude-3-5-haiku-20241022' });
 
       // Start text streaming
       session.setTextStreaming(true);
@@ -330,7 +334,7 @@ describe('GraphSession', () => {
         model: 'claude-3-5-haiku-20241022',
       };
 
-      session.initializeStatusUpdates(config, 'claude-3-5-haiku-20241022');
+      session.initializeStatusUpdates(config, { model: 'claude-3-5-haiku-20241022' });
 
       // End session immediately to create race condition
       session.cleanup();
@@ -538,6 +542,313 @@ describe('GraphSession', () => {
       expect(flexibleSummary.details?.customField).toBe('custom value');
       expect(flexibleSummary.details?.nestedData.level).toBe(2);
       expect(Array.isArray(flexibleSummary.details?.nestedData.items)).toBe(true);
+    });
+
+    it('should call writeSummary for structured status updates', async () => {
+      const config: StatusUpdateSettings = {
+        enabled: true,
+        numEvents: 1,
+        model: 'claude-3-5-haiku-20241022',
+        statusComponents: [
+          {
+            id: 'test_component',
+            type: 'test_component',
+            name: 'Test Component',
+            description: 'Test component for status updates',
+            detailsSchema: {
+              type: 'object',
+              properties: {
+                label: { type: 'string' },
+                value: { type: 'string' }
+              },
+              required: ['label']
+            }
+          }
+        ]
+      };
+
+      session.initializeStatusUpdates(config, { model: 'claude-3-5-haiku-20241022' });
+
+      // Mock the generateObject response
+      const { generateObject } = await import('ai');
+      vi.mocked(generateObject).mockResolvedValueOnce({
+        object: {
+          test_component: {
+            label: 'Found test result',
+            value: 'Test value'
+          }
+        }
+      });
+
+      // Add an event to trigger status update
+      session.recordEvent('tool_execution', 'agent-1', {
+        toolName: 'search',
+        args: { query: 'test' },
+        result: 'found results'
+      });
+
+      // Wait for async status update to complete
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Verify writeSummary was called with the correct structure
+      expect(mockStreamHelper.writeSummary).toHaveBeenCalledWith({
+        label: 'Found test result',
+        data: {
+          value: 'Test value'
+        }
+      });
+    });
+
+    it('should call writeSummary for text-based status updates', async () => {
+      const config: StatusUpdateSettings = {
+        enabled: true,
+        numEvents: 1,
+        model: 'claude-3-5-haiku-20241022'
+        // No statusComponents - triggers text-based updates
+      };
+
+      session.initializeStatusUpdates(config, { model: 'claude-3-5-haiku-20241022' });
+
+      // Mock the generateText response
+      const { generateText } = await import('ai');
+      vi.mocked(generateText).mockResolvedValueOnce({
+        text: 'Processing search results and analyzing data'
+      });
+
+      // Add an event to trigger status update
+      session.recordEvent('tool_execution', 'agent-1', {
+        toolName: 'process',
+        args: { data: 'test data' },
+        result: 'processed'
+      });
+
+      // Wait for async status update to complete
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Verify writeSummary was called with just a label
+      expect(mockStreamHelper.writeSummary).toHaveBeenCalledWith({
+        label: 'Processing search results and analyzing data'
+      });
+    });
+
+    it('should call writeSummary multiple times for multiple structured components', async () => {
+      const config: StatusUpdateSettings = {
+        enabled: true,
+        numEvents: 1,
+        model: 'claude-3-5-haiku-20241022',
+        statusComponents: [
+          {
+            id: 'progress',
+            type: 'progress',
+            name: 'Progress Update',
+            description: 'Progress information',
+            detailsSchema: {
+              type: 'object',
+              properties: {
+                label: { type: 'string' },
+                percentage: { type: 'number' }
+              },
+              required: ['label']
+            }
+          },
+          {
+            id: 'result',
+            type: 'result',
+            name: 'Result Update',
+            description: 'Result information',
+            detailsSchema: {
+              type: 'object',
+              properties: {
+                label: { type: 'string' },
+                items: { type: 'array', items: { type: 'string' } }
+              },
+              required: ['label']
+            }
+          }
+        ]
+      };
+
+      session.initializeStatusUpdates(config, { model: 'claude-3-5-haiku-20241022' });
+
+      // Mock the generateObject response with multiple components
+      const { generateObject } = await import('ai');
+      vi.mocked(generateObject).mockResolvedValueOnce({
+        object: {
+          progress: {
+            label: 'Analyzed 50% of data',
+            percentage: 50
+          },
+          result: {
+            label: 'Found 3 matching items',
+            items: ['item1', 'item2', 'item3']
+          }
+        }
+      });
+
+      // Add an event to trigger status update
+      session.recordEvent('agent_generate', 'agent-1', {
+        parts: [{ type: 'text', content: 'Processing' }],
+        generationType: 'text_generation'
+      });
+
+      // Wait for async status update to complete
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Verify writeSummary was called twice, once for each component
+      expect(mockStreamHelper.writeSummary).toHaveBeenCalledTimes(2);
+      expect(mockStreamHelper.writeSummary).toHaveBeenNthCalledWith(1, {
+        label: 'Analyzed 50% of data',
+        data: {
+          percentage: 50
+        }
+      });
+      expect(mockStreamHelper.writeSummary).toHaveBeenNthCalledWith(2, {
+        label: 'Found 3 matching items',
+        data: {
+          items: ['item1', 'item2', 'item3']
+        }
+      });
+    });
+
+    it('should not call writeSummary when no_relevant_updates is returned', async () => {
+      const config: StatusUpdateSettings = {
+        enabled: true,
+        numEvents: 1,
+        model: 'claude-3-5-haiku-20241022',
+        statusComponents: [
+          {
+            id: 'update',
+            type: 'update',
+            name: 'Update Component',
+            description: 'Update information',
+            detailsSchema: {
+              type: 'object',
+              properties: {
+                label: { type: 'string' }
+              },
+              required: ['label']
+            }
+          }
+        ]
+      };
+
+      session.initializeStatusUpdates(config, { model: 'claude-3-5-haiku-20241022' });
+
+      // Mock the generateObject response with no_relevant_updates
+      const { generateObject } = await import('ai');
+      vi.mocked(generateObject).mockResolvedValueOnce({
+        object: {
+          no_relevant_updates: {
+            no_updates: true
+          }
+        }
+      });
+
+      // Clear any previous calls
+      vi.clearAllMocks();
+
+      // Add an event to trigger status update
+      session.recordEvent('tool_execution', 'agent-1', {
+        toolName: 'check',
+        args: {},
+        result: 'no changes'
+      });
+
+      // Wait for async status update to complete
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Verify writeSummary was NOT called since no_relevant_updates was returned
+      expect(mockStreamHelper.writeSummary).not.toHaveBeenCalled();
+    });
+
+    it('should filter out empty summary data before calling writeSummary', async () => {
+      const config: StatusUpdateSettings = {
+        enabled: true,
+        numEvents: 1,
+        model: 'claude-3-5-haiku-20241022',
+        statusComponents: [
+          {
+            id: 'component1',
+            type: 'component1',
+            name: 'Component 1',
+            description: 'First component',
+            detailsSchema: {
+              type: 'object',
+              properties: {
+                label: { type: 'string' }
+              },
+              required: ['label']
+            }
+          }
+        ]
+      };
+
+      session.initializeStatusUpdates(config, { model: 'claude-3-5-haiku-20241022' });
+
+      // Mock the generateObject response with empty data
+      const { generateObject } = await import('ai');
+      vi.mocked(generateObject).mockResolvedValueOnce({
+        object: {
+          component1: {} // Empty object - should be filtered out
+        }
+      });
+
+      // Clear any previous calls
+      vi.clearAllMocks();
+
+      // Add an event to trigger status update
+      session.recordEvent('artifact_saved', 'agent-1', {
+        artifactId: 'art-1',
+        taskId: 'task-1',
+        artifactType: 'data',
+        summaryData: {}
+      });
+
+      // Wait for async status update to complete
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Verify writeSummary was NOT called due to empty data
+      expect(mockStreamHelper.writeSummary).not.toHaveBeenCalled();
+    });
+
+    it('should call writeSummary with custom prompt in status updates', async () => {
+      const customPrompt = 'Always mention the task completion percentage';
+      const config: StatusUpdateSettings = {
+        enabled: true,
+        numEvents: 1,
+        model: 'claude-3-5-haiku-20241022',
+        prompt: customPrompt
+      };
+
+      session.initializeStatusUpdates(config, { model: 'claude-3-5-haiku-20241022' });
+
+      // Mock the generateText response
+      const { generateText } = await import('ai');
+      vi.mocked(generateText).mockResolvedValueOnce({
+        text: 'Task 75% complete - analyzing remaining data'
+      });
+
+      // Add an event to trigger status update
+      session.recordEvent('transfer', 'agent-1', {
+        fromAgent: 'agent-1',
+        targetAgent: 'agent-2',
+        reason: 'Continue processing'
+      });
+
+      // Wait for async status update to complete
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Verify writeSummary was called with the custom prompt result
+      expect(mockStreamHelper.writeSummary).toHaveBeenCalledWith({
+        label: 'Task 75% complete - analyzing remaining data'
+      });
+
+      // Verify generateText was called with the custom prompt
+      expect(generateText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: expect.stringContaining(customPrompt)
+        })
+      );
     });
   });
 
