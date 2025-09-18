@@ -180,6 +180,7 @@ vi.mock('../../utils/stream-helpers.js', () => ({
     writeError: vi.fn(),
     writeData: vi.fn(),
     writeOperation: vi.fn(),
+    writeSummary: vi.fn(),
     streamText: vi.fn(),
     streamData: vi.fn(),
   }),

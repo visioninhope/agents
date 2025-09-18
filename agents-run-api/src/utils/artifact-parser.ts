@@ -16,7 +16,7 @@ export interface ArtifactData {
   taskId: string;
   name: string;
   description: string;
-  artifactType?: string;
+  type?: string; // Artifact type for consistency with summary events
   artifactSummary: any;
 }
 
@@ -147,7 +147,7 @@ export class ArtifactParser {
       taskId,
       name: artifact.name || 'Processing...',
       description: artifact.description || 'Name and description being generated...',
-      artifactType: artifact.metadata?.artifactType,
+      type: artifact.metadata?.artifactType || artifact.artifactType, // Map artifactType to type for consistency
       artifactSummary: artifact.parts?.[0]?.data?.summary || {},
     };
   }
@@ -173,7 +173,7 @@ export class ArtifactParser {
       // Add text before artifact
       if (matchStart > lastIndex) {
         const textBefore = text.slice(lastIndex, matchStart);
-        if (textBefore.trim()) {
+        if (textBefore) {
           parts.push({ kind: 'text', text: textBefore });
         }
       }
@@ -191,7 +191,7 @@ export class ArtifactParser {
     // Add remaining text
     if (lastIndex < text.length) {
       const remainingText = text.slice(lastIndex);
-      if (remainingText.trim()) {
+      if (remainingText) {
         parts.push({ kind: 'text', text: remainingText });
       }
     }
