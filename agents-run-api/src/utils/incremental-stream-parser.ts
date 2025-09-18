@@ -25,6 +25,10 @@ export class IncrementalStreamParser {
   private componentAccumulator: any = {};
   private lastStreamedComponents = new Map<string, any>();
   private componentSnapshots = new Map<string, string>();
+  
+  // Memory management constants
+  private static readonly MAX_SNAPSHOT_SIZE = 100; // Max number of snapshots to keep
+  private static readonly MAX_STREAMED_SIZE = 1000; // Max number of streamed component IDs to track
 
   constructor(streamHelper: StreamHelper, tenantId: string, contextId: string) {
     this.streamHelper = streamHelper;
@@ -114,10 +118,50 @@ export class IncrementalStreamParser {
         const currentSnapshot = JSON.stringify(component);
         const previousSnapshot = this.componentSnapshots.get(componentKey);
 
-        // Update snapshot
+        // Update snapshot with size limit enforcement
         this.componentSnapshots.set(componentKey, currentSnapshot);
+        
+        // Enforce size limit - remove oldest entries if exceeded
+        if (this.componentSnapshots.size > IncrementalStreamParser.MAX_SNAPSHOT_SIZE) {
+          const firstKey = this.componentSnapshots.keys().next().value;
+          if (firstKey) {
+            this.componentSnapshots.delete(firstKey);
+          }
+        }
 
-        // Stream if component is complete AND props haven't changed (stable)
+        // Special handling for Text components - stream the text content immediately
+        if (component.name === 'Text' && component.props?.text) {
+          // For Text components, stream the incremental text immediately
+          const previousTextContent = previousSnapshot
+            ? JSON.parse(previousSnapshot).props?.text || ''
+            : '';
+          const currentTextContent = component.props.text || '';
+
+          // Only stream the new text that was added
+          if (currentTextContent.length > previousTextContent.length) {
+            const newText = currentTextContent.slice(previousTextContent.length);
+
+            // Stream directly to avoid artifact parsing overhead and trimming
+            if (!this.hasStartedRole) {
+              await this.streamHelper.writeRole('assistant');
+              this.hasStartedRole = true;
+            }
+
+            // Stream text directly without going through streamPart
+            await this.streamHelper.streamText(newText, 50);
+
+            // Still collect for final response
+            this.collectedParts.push({
+              kind: 'text',
+              text: newText,
+            });
+          }
+
+          // Don't mark as streamed yet - let it keep streaming incrementally
+          continue;
+        }
+
+        // For non-Text components, use stability checking
         if (this.isComponentComplete(component)) {
           const currentPropsSnapshot = JSON.stringify(component.props);
           const previousPropsSnapshot = previousSnapshot
@@ -134,8 +178,10 @@ export class IncrementalStreamParser {
 
   /**
    * Stream a component and mark it as streamed
+   * Note: Text components are handled separately with incremental streaming
    */
   private async streamComponent(component: any): Promise<void> {
+    // Stream as regular data component (Text components handled elsewhere)
     const parts = await this.artifactParser.parseObject({
       dataComponents: [component],
     });
@@ -146,6 +192,17 @@ export class IncrementalStreamParser {
 
     // Mark as streamed
     this.lastStreamedComponents.set(component.id, true);
+    
+    // Enforce size limit for streamed components map
+    if (this.lastStreamedComponents.size > IncrementalStreamParser.MAX_STREAMED_SIZE) {
+      const firstKey = this.lastStreamedComponents.keys().next().value;
+      if (firstKey) {
+        this.lastStreamedComponents.delete(firstKey);
+      }
+    }
+    
+    // Clean up snapshot after streaming
+    this.componentSnapshots.delete(component.id);
   }
 
   /**
@@ -221,7 +278,8 @@ export class IncrementalStreamParser {
         const hasBeenStreamed = this.lastStreamedComponents.has(componentKey);
 
         // Stream any complete components that haven't been streamed yet
-        if (!hasBeenStreamed && this.isComponentComplete(component)) {
+        // Skip Text components as they've already been streamed incrementally
+        if (!hasBeenStreamed && this.isComponentComplete(component) && component.name !== 'Text') {
           const parts = await this.artifactParser.parseObject({
             dataComponents: [component],
           });
@@ -231,6 +289,17 @@ export class IncrementalStreamParser {
           }
 
           this.lastStreamedComponents.set(componentKey, true);
+          
+          // Enforce size limit for streamed components map
+          if (this.lastStreamedComponents.size > IncrementalStreamParser.MAX_STREAMED_SIZE) {
+            const firstKey = this.lastStreamedComponents.keys().next().value;
+            if (firstKey) {
+              this.lastStreamedComponents.delete(firstKey);
+            }
+          }
+          
+          // Clean up snapshot after streaming
+          this.componentSnapshots.delete(componentKey);
         }
       }
     }
@@ -263,6 +332,12 @@ export class IncrementalStreamParser {
       }
       this.pendingTextBuffer = '';
     }
+    
+    // Clean up all Maps to prevent memory leaks
+    this.componentSnapshots.clear();
+    this.lastStreamedComponents.clear();
+    // Reset accumulator
+    this.componentAccumulator = {};
   }
 
   /**
