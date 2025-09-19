@@ -9,6 +9,7 @@ import {
   getAgentGraphWithDefaultAgent,
   getRequestExecutionContext,
   handleContextResolution,
+  loggerFactory,
   setActiveAgentForConversation,
 } from '@inkeep/agents-core';
 import { trace } from '@opentelemetry/api';
@@ -90,6 +91,10 @@ app.openapi(chatDataStreamRoute, async (c) => {
     const executionContext = getRequestExecutionContext(c);
     const { tenantId, projectId, graphId } = executionContext;
 
+    loggerFactory
+      .getLogger('chatDataStream')
+      .debug({ tenantId, projectId, graphId }, 'Extracted chatDataStream parameters');
+
     // Get parsed body from middleware (shared across all handlers)
     const body = c.get('requestBody') || {};
     const conversationId = body.conversationId || nanoid();
@@ -105,8 +110,7 @@ app.openapi(chatDataStreamRoute, async (c) => {
     }
 
     const agentGraph = await getAgentGraphWithDefaultAgent(dbClient)({
-      scopes: { tenantId, projectId },
-      graphId,
+      scopes: { tenantId, projectId, graphId },
     });
     if (!agentGraph) {
       return c.json({ error: 'Agent graph not found' }, 404);
@@ -114,6 +118,10 @@ app.openapi(chatDataStreamRoute, async (c) => {
 
     const defaultAgentId = agentGraph.defaultAgentId;
     const graphName = agentGraph.name;
+
+    if (!defaultAgentId) {
+      return c.json({ error: 'Graph does not have a default agent configured' }, 400);
+    }
 
     const activeAgent = await getActiveAgentForConversation(dbClient)({
       scopes: { tenantId, projectId },
@@ -129,7 +137,7 @@ app.openapi(chatDataStreamRoute, async (c) => {
     const agentId = activeAgent?.activeAgentId || defaultAgentId;
 
     const agentInfo = await getAgentById(dbClient)({
-      scopes: { tenantId, projectId },
+      scopes: { tenantId, projectId, graphId },
       agentId: agentId as string,
     });
     if (!agentInfo) {
@@ -141,15 +149,15 @@ app.openapi(chatDataStreamRoute, async (c) => {
     const credentialStores = c.get('credentialStores');
 
     // Context resolution with intelligent conversation state detection
-    await handleContextResolution(
+    await handleContextResolution({
       tenantId,
       projectId,
-      conversationId,
       graphId,
-      validatedContext,
+      conversationId,
+      requestContext: validatedContext,
       dbClient,
-      credentialStores
-    );
+      credentialStores,
+    });
 
     // Store last user message
     const lastUserMessage = body.messages.filter((m: any) => m.role === 'user').slice(-1)[0];

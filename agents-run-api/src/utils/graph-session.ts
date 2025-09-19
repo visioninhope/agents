@@ -800,7 +800,11 @@ ${this.statusUpdateState?.config.prompt?.trim() || ''}`;
             }
             modelToUse = this.statusUpdateState.baseModel;
           }
-          const model = ModelFactory.createModel(modelToUse!);
+
+          if (!modelToUse) {
+            throw new Error('No model configuration available');
+          }
+          const model = ModelFactory.createModel(modelToUse);
 
           const { text } = await generateText({
             model,
@@ -956,7 +960,11 @@ ${this.statusUpdateState?.config.prompt?.trim() || ''}`;
             }
             modelToUse = this.statusUpdateState.baseModel;
           }
-          const model = ModelFactory.createModel(modelToUse!);
+
+          if (!modelToUse) {
+            throw new Error('No model configuration available');
+          }
+          const model = ModelFactory.createModel(modelToUse);
 
           const { object } = await generateObject({
             model,
@@ -1316,7 +1324,11 @@ Make it specific and relevant.`;
             }
             modelToUse = this.statusUpdateState.baseModel;
           }
-          const model = ModelFactory.createModel(modelToUse!);
+
+          if (!modelToUse) {
+            throw new Error('No model configuration available');
+          }
+          const model = ModelFactory.createModel(modelToUse);
 
           const schema = z.object({
             name: z.string().max(50).describe('Concise, descriptive name for the artifact'),

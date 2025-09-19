@@ -546,8 +546,12 @@ export class Agent {
     const credentialReferenceId = tool.credentialReferenceId;
 
     const toolsForAgent = await getToolsForAgent(dbClient)({
-      scopes: { tenantId: this.config.tenantId, projectId: this.config.projectId },
-      agentId: this.config.id,
+      scopes: {
+        tenantId: this.config.tenantId,
+        projectId: this.config.projectId,
+        graphId: this.config.graphId,
+        agentId: this.config.id,
+      },
     });
 
     const selectedTools =
@@ -729,8 +733,8 @@ export class Agent {
         scopes: {
           tenantId: this.config.tenantId,
           projectId: this.config.projectId,
+          graphId: this.config.graphId,
         },
-        graphId: this.config.graphId,
       });
 
       return graphDefinition?.graphPrompt || undefined;
@@ -755,18 +759,20 @@ export class Agent {
         scopes: {
           tenantId: this.config.tenantId,
           projectId: this.config.projectId,
+          graphId: this.config.graphId,
         },
-        graphId: this.config.graphId,
       });
 
       if (!graphDefinition) {
         return false;
       }
 
-      // Check if artifactComponents exists and has any entries
-      return !!(
-        graphDefinition.artifactComponents &&
-        Object.keys(graphDefinition.artifactComponents).length > 0
+      // Check if any agent in the graph has artifact components
+      return Object.values(graphDefinition.agents).some(
+        (agent) =>
+          'artifactComponents' in agent &&
+          agent.artifactComponents &&
+          agent.artifactComponents.length > 0
       );
     } catch (error) {
       logger.warn(
@@ -1029,8 +1035,8 @@ Key requirements:
         scopes: {
           tenantId: this.config.tenantId,
           projectId: this.config.projectId,
+          graphId: this.config.graphId,
         },
-        graphId: this.config.graphId,
       });
     } catch (error) {
       logger.error(
