@@ -3,23 +3,19 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { GenericComboBox } from '@/components/form/generic-combo-box';
 import { GenericInput } from '@/components/form/generic-input';
-import type { SelectOption } from '@/components/form/generic-select';
 import { GenericSelect } from '@/components/form/generic-select';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
-import { createApiKeyAction } from '@/lib/actions/api-keys';
-import type { ApiKey, ApiKeyCreateResponse } from '@/lib/api/api-keys';
-import { defaultValues } from './form-configuration';
-import { type ApiKeyFormData, apiKeySchema, EXPIRATION_DATE_OPTIONS } from './validation';
+import { updateApiKeyAction } from '@/lib/actions/api-keys';
+import type { ApiKey } from '@/lib/api/api-keys';
+import { type ApiKeyUpdateData, apiKeyUpdateSchema, EXPIRATION_DATE_OPTIONS } from './validation';
 
-interface ApiKeyFormProps {
+interface ApiKeyUpdateFormProps {
   tenantId: string;
   projectId: string;
-  initialData?: ApiKeyFormData;
-  graphsOptions: SelectOption[];
-  onApiKeyCreated?: (apiKeyData: ApiKeyCreateResponse) => void;
+  apiKey: ApiKey;
+  onApiKeyUpdated?: (apiKeyData: ApiKey) => void;
 }
 
 const convertDurationToDate = (duration: string): string | undefined => {
@@ -52,41 +48,72 @@ const convertDurationToDate = (duration: string): string | undefined => {
   return now.toISOString();
 };
 
-export function ApiKeyForm({
+const convertDateToDuration = (isoDate?: string): 'never' | '1d' | '1w' | '1m' | '3m' | '1y' => {
+  if (!isoDate) {
+    return 'never';
+  }
+
+  const now = new Date();
+  const expirationDate = new Date(isoDate);
+  const diffMs = expirationDate.getTime() - now.getTime();
+
+  // If the date is in the past or very close to now, default to 'never'
+  if (diffMs <= 0) {
+    return 'never';
+  }
+
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+  const diffMonths = Math.round(diffMs / (1000 * 60 * 60 * 24 * 30));
+  const diffYears = Math.round(diffMs / (1000 * 60 * 60 * 24 * 365));
+
+  // Find the closest matching duration option
+  if (diffDays <= 1) return '1d';
+  if (diffDays <= 7) return '1w';
+  if (diffMonths <= 1) return '1m';
+  if (diffMonths <= 3) return '3m';
+  if (diffYears <= 1) return '1y';
+
+  // For dates far in the future, default to 1 year
+  return '1y';
+};
+
+export function ApiKeyUpdateForm({
   tenantId,
   projectId,
-  initialData,
-  graphsOptions,
-  onApiKeyCreated,
-}: ApiKeyFormProps) {
-  const form = useForm<ApiKeyFormData>({
-    resolver: zodResolver(apiKeySchema),
-    defaultValues: initialData || defaultValues,
+  apiKey,
+  onApiKeyUpdated,
+}: ApiKeyUpdateFormProps) {
+  const form = useForm<ApiKeyUpdateData>({
+    resolver: zodResolver(apiKeyUpdateSchema),
+    defaultValues: {
+      name: apiKey.name || 'No Name',
+      expiresAt: convertDateToDuration(apiKey.expiresAt),
+    },
   });
 
   const { isSubmitting } = form.formState;
 
-  const onSubmit = async (data: ApiKeyFormData) => {
+  const onSubmit = async (data: ApiKeyUpdateData) => {
     try {
       const expiresAt = data.expiresAt ? convertDurationToDate(data.expiresAt) : undefined;
       const name = data.name;
 
       const payload: Partial<ApiKey> = {
-        graphId: data.graphId,
+        id: apiKey.id,
         expiresAt,
         name,
       };
 
-      const res = await createApiKeyAction(tenantId, projectId, payload);
+      const res = await updateApiKeyAction(tenantId, projectId, payload);
       if (!res.success) {
-        toast.error(res.error || 'Failed to create api key');
+        toast.error(res.error || 'Failed to update api key');
         return;
       }
 
       if (res.data) {
-        onApiKeyCreated?.(res.data);
+        onApiKeyUpdated?.(res.data);
       }
-      toast.success('API key created successfully');
+      toast.success('API key updated successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
       toast.error(errorMessage);
@@ -112,18 +139,9 @@ export function ApiKeyForm({
           selectTriggerClassName="w-full"
           isRequired
         />
-        <GenericComboBox
-          control={form.control}
-          name="graphId"
-          label="Graph"
-          options={graphsOptions}
-          placeholder="Select a graph"
-          searchPlaceholder="Search graphs..."
-          isRequired
-        />
         <div className="flex justify-end">
           <Button type="submit" disabled={isSubmitting}>
-            Create API key
+            Update API key
           </Button>
         </div>
       </form>
