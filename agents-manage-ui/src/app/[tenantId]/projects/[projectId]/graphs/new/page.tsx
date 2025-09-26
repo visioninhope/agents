@@ -2,6 +2,7 @@ import { Graph } from '@/components/graph/graph';
 import { BodyTemplate } from '@/components/layout/body-template';
 import { fetchArtifactComponentsAction } from '@/lib/actions/artifact-components';
 import { fetchDataComponentsAction } from '@/lib/actions/data-components';
+import { fetchToolsAction } from '@/lib/actions/tools';
 import { createLookup } from '@/lib/utils';
 
 async function NewGraphPage({
@@ -10,13 +11,19 @@ async function NewGraphPage({
   params: Promise<{ tenantId: string; projectId: string }>;
 }) {
   const { tenantId, projectId } = await params;
-  const [dataComponents, artifactComponents] = await Promise.all([
+  const [dataComponents, artifactComponents, tools] = await Promise.all([
     fetchDataComponentsAction(tenantId, projectId),
     fetchArtifactComponentsAction(tenantId, projectId),
+    fetchToolsAction(tenantId, projectId),
   ]);
 
-  if (!dataComponents.success || !artifactComponents.success) {
-    console.error('Failed to fetch components:', dataComponents.error, artifactComponents.error);
+  if (!dataComponents.success || !artifactComponents.success || !tools.success) {
+    console.error(
+      'Failed to fetch components:',
+      dataComponents.error,
+      artifactComponents.error,
+      tools.error
+    );
   }
 
   const dataComponentLookup = createLookup(
@@ -26,6 +33,7 @@ async function NewGraphPage({
   const artifactComponentLookup = createLookup(
     artifactComponents.success ? artifactComponents.data : undefined
   );
+  const toolLookup = createLookup(tools.success ? tools.data : undefined);
 
   return (
     <BodyTemplate
@@ -37,6 +45,7 @@ async function NewGraphPage({
       <Graph
         dataComponentLookup={dataComponentLookup}
         artifactComponentLookup={artifactComponentLookup}
+        toolLookup={toolLookup}
       />
     </BodyTemplate>
   );
