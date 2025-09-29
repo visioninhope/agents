@@ -14,7 +14,6 @@ import type {
   FullGraphDefinition,
   InternalAgentDefinition,
 } from '@/lib/types/graph-full';
-
 import { formatJsonField } from '@/lib/utils';
 
 interface TransformResult {
@@ -118,7 +117,9 @@ export function deserializeGraphData(data: FullGraphDefinition): TransformResult
           name: agent.name,
           description: agent.description,
           baseUrl: (agent as ExternalAgentDefinition).baseUrl,
+          headers: formatJsonField(agent.headers) || '{}',
           type: agent.type,
+          credentialReferenceId: agent.credentialReferenceId,
         }
       : (() => {
           const internalAgent = agent as InternalAgentDefinition;
