@@ -253,7 +253,9 @@ export function TimelineWrapper({
 
   const closePanel = () => {
     setPanelVisible(false);
-    setTimeout(() => setSelected(null), 300);
+    setTimeout(() => {
+      setSelected(null);
+    }, 300);
   };
 
   const findSpanById = (id?: string) =>
@@ -355,12 +357,13 @@ export function TimelineWrapper({
                 <StickToBottom.Content>
                   <ActivityTimeline
                     activities={sortedActivities}
-                    onSelect={(activity) =>
+                    onSelect={(activity) => {
                       setSelected({
                         type: determinePanelType(activity),
                         item: activity,
-                      })
-                    }
+                      });
+                    }}
+                    selectedActivityId={selected?.item?.id}
                     collapsedAiMessages={collapsedAiMessages}
                     onToggleAiMessageCollapse={toggleAiMessageCollapse}
                   />
@@ -388,12 +391,13 @@ export function TimelineWrapper({
               <div className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-muted-foreground/30 scrollbar-track-transparent dark:scrollbar-thumb-muted-foreground/50">
                 <ActivityTimeline
                   activities={sortedActivities}
-                  onSelect={(activity) =>
+                  onSelect={(activity) => {
                     setSelected({
                       type: determinePanelType(activity),
                       item: activity,
-                    })
-                  }
+                    });
+                  }}
+                  selectedActivityId={selected?.item?.id}
                   collapsedAiMessages={collapsedAiMessages}
                   onToggleAiMessageCollapse={toggleAiMessageCollapse}
                 />
