@@ -1,7 +1,7 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray, not } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import type { DatabaseClient } from '../db/client';
-import { agents, projects } from '../db/schema';
+import { agents, agentToolRelations, projects } from '../db/schema';
 import type {
   AgentDefinition,
   ExternalAgentApiInsert,
@@ -24,7 +24,6 @@ import {
 } from './agentGraphs';
 import {
   createAgentRelation,
-  createAgentToolRelation,
   deleteAgentRelationsByGraph,
   deleteAgentToolRelationByAgent,
   upsertAgentRelation,
@@ -357,7 +356,7 @@ export const createFullGraphServerSide =
             agentToolPromises.push(
               (async () => {
                 try {
-                  const { toolId, toolSelection, headers } = canUseItem;
+                  const { toolId, toolSelection, headers, agentToolRelationId } = canUseItem;
                   logger.info({ agentId, toolId }, 'Processing agent-tool relation');
                   await upsertAgentToolRelation(db)({
                     scopes: { tenantId, projectId, graphId: finalGraphId },
@@ -365,6 +364,7 @@ export const createFullGraphServerSide =
                     toolId,
                     selectedTools: toolSelection || undefined,
                     headers: headers || undefined,
+                    relationId: agentToolRelationId,
                   });
                   logger.info({ agentId, toolId }, 'Agent-tool relation processed successfully');
                 } catch (error) {
@@ -842,15 +842,65 @@ export const updateFullGraphServerSide =
 
       logger.info({ graphId: typedGraphDefinition.id }, 'Graph metadata updated');
 
-      // Step 9: Clear and recreate agent-tool relationships
-      // First, delete existing relationships for all agents in this graph
-      for (const agentId of Object.keys(typedGraphDefinition.agents)) {
-        await deleteAgentToolRelationByAgent(db)({
-          scopes: { tenantId, projectId, graphId: finalGraphId, agentId },
-        });
+      // Step 9: Update agent-tool relationships (selective delete and upsert)
+
+      // First, collect all incoming relationshipIds
+      const incomingRelationshipIds = new Set<string>();
+      for (const [_agentId, agentData] of Object.entries(typedGraphDefinition.agents)) {
+        if (isInternalAgent(agentData) && agentData.canUse && Array.isArray(agentData.canUse)) {
+          for (const canUseItem of agentData.canUse) {
+            if (canUseItem.agentToolRelationId) {
+              incomingRelationshipIds.add(canUseItem.agentToolRelationId);
+            }
+          }
+        }
       }
 
-      // Then create new relationships
+      // Delete relationships that are not in the incoming set (for agents in this graph)
+      // Use atomic deletion to avoid race conditions
+      for (const agentId of Object.keys(typedGraphDefinition.agents)) {
+        try {
+          let deletedCount = 0;
+
+          if (incomingRelationshipIds.size === 0) {
+            // Delete all relationships for this agent if no incoming IDs
+            const result = await db
+              .delete(agentToolRelations)
+              .where(
+                and(
+                  eq(agentToolRelations.tenantId, tenantId),
+                  eq(agentToolRelations.projectId, projectId),
+                  eq(agentToolRelations.graphId, finalGraphId),
+                  eq(agentToolRelations.agentId, agentId)
+                )
+              );
+            deletedCount = result.rowsAffected || 0;
+          } else {
+            // Delete relationships not in the incoming set
+            const result = await db
+              .delete(agentToolRelations)
+              .where(
+                and(
+                  eq(agentToolRelations.tenantId, tenantId),
+                  eq(agentToolRelations.projectId, projectId),
+                  eq(agentToolRelations.graphId, finalGraphId),
+                  eq(agentToolRelations.agentId, agentId),
+                  not(inArray(agentToolRelations.id, Array.from(incomingRelationshipIds)))
+                )
+              );
+            deletedCount = result.rowsAffected || 0;
+          }
+
+          if (deletedCount > 0) {
+            logger.info({ agentId, deletedCount }, 'Deleted orphaned agent-tool relations');
+          }
+        } catch (error) {
+          logger.error({ agentId, error }, 'Failed to delete orphaned agent-tool relations');
+          // Don't throw - allow partial success for relations
+        }
+      }
+
+      // Then upsert the incoming relationships
       const agentToolPromises: Promise<void>[] = [];
 
       for (const [agentId, agentData] of Object.entries(typedGraphDefinition.agents)) {
@@ -859,22 +909,28 @@ export const updateFullGraphServerSide =
             agentToolPromises.push(
               (async () => {
                 try {
-                  const { toolId, toolSelection, headers } = canUseItem;
-                  await createAgentToolRelation(db)({
+                  const { toolId, toolSelection, headers, agentToolRelationId } = canUseItem;
+                  await upsertAgentToolRelation(db)({
                     scopes: { tenantId, projectId, graphId: finalGraphId },
-                    data: {
-                      agentId,
-                      toolId,
-                      selectedTools: toolSelection || undefined,
-                      headers: headers || undefined,
-                    },
+                    agentId,
+                    toolId,
+                    selectedTools: toolSelection || undefined,
+                    headers: headers || undefined,
+                    relationId: agentToolRelationId,
                   });
-
-                  logger.info({ agentId, toolId }, 'Agent-tool relation created');
+                  logger.info(
+                    { agentId, toolId, relationId: agentToolRelationId },
+                    'Agent-tool relation upserted'
+                  );
                 } catch (error) {
                   logger.error(
-                    { agentId, toolId: canUseItem.toolId, error },
-                    'Failed to create agent-tool relation'
+                    {
+                      agentId,
+                      toolId: canUseItem.toolId,
+                      relationId: canUseItem.agentToolRelationId,
+                      error,
+                    },
+                    'Failed to upsert agent-tool relation'
                   );
                   // Don't throw - allow partial success for relations
                 }
