@@ -22,7 +22,6 @@ export function createDefaultCredentialStores(): CredentialStore[] {
     );
   }
 
-  // Always include keychain store
   stores.push(createKeyChainStore('keychain-default'));
 
   return stores;
