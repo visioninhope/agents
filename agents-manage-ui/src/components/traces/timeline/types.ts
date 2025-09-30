@@ -73,6 +73,9 @@ export interface ActivityItem {
   aiStreamTextModel?: string;
   aiStreamTextProvider?: string;
   aiStreamTextOperationId?: string;
+  toolCallArgs?: string;
+  toolCallResult?: string;
+  aiResponseText?: string;
 }
 
 export interface ToolCall {
