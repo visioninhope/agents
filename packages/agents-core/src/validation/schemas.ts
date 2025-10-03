@@ -666,6 +666,8 @@ export const GraphWithinContextOfProjectSchema = AgentGraphApiInsertSchema.exten
       ExternalAgentApiInsertSchema.extend({ type: z.literal('external') }),
     ])
   ),
+  contextConfig: z.optional(ContextConfigApiInsertSchema),
+  statusUpdates: z.optional(StatusUpdateSchema),
   models: ModelSchema.optional(),
   stopWhen: GraphStopWhenSchema.optional(),
   graphPrompt: z.string().max(5000, 'Graph prompt cannot exceed 5000 characters').optional(),
@@ -729,7 +731,6 @@ export const FullProjectDefinitionSchema = ProjectApiInsertSchema.extend({
   tools: z.record(z.string(), ToolApiInsertSchema),
   dataComponents: z.record(z.string(), DataComponentApiInsertSchema).optional(),
   artifactComponents: z.record(z.string(), ArtifactComponentApiInsertSchema).optional(),
-  contextConfig: z.record(z.string(), ContextConfigApiInsertSchema).optional(),
   statusUpdates: z.optional(StatusUpdateSchema),
   credentialReferences: z.record(z.string(), CredentialReferenceApiInsertSchema).optional(),
   createdAt: z.string().optional(),
