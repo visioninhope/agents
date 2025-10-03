@@ -5,7 +5,11 @@ import type { StreamableHTTPClientTransportOptions } from '@modelcontextprotocol
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { DEFAULT_REQUEST_TIMEOUT_MSEC } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import { CallToolResultSchema, type ClientCapabilities, type Tool } from '@modelcontextprotocol/sdk/types.js';
+import {
+  CallToolResultSchema,
+  type ClientCapabilities,
+  type Tool,
+} from '@modelcontextprotocol/sdk/types.js';
 
 import { tool } from 'ai';
 import { asyncExitHook, gracefulExit } from 'exit-hook';
@@ -65,6 +69,10 @@ export class McpClient {
       { name: opts.name, version: opts.version || '1.0.0' },
       { capabilities: opts.capabilities || {} }
     );
+  }
+
+  isConnected(): boolean {
+    return this.connected;
   }
 
   async connect() {

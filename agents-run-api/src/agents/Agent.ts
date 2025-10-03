@@ -42,6 +42,7 @@ import {
 } from '../data/conversations';
 
 import dbClient from '../data/db/dbClient';
+import { defaultBatchProcessor } from '../instrumentation';
 import { getLogger } from '../logger';
 import { graphSessionManager } from '../services/GraphSession';
 import { IncrementalStreamParser } from '../services/IncrementalStreamParser';
@@ -166,6 +167,8 @@ export class Agent {
   private isDelegatedAgent: boolean = false;
   private contextResolver?: ContextResolver;
   private credentialStoreRegistry?: CredentialStoreRegistry;
+  private mcpClientCache: Map<string, McpClient> = new Map();
+  private mcpConnectionLocks: Map<string, Promise<McpClient>> = new Map();
 
   constructor(config: AgentConfig, credentialStoreRegistry?: CredentialStoreRegistry) {
     // Store artifact components separately
@@ -598,6 +601,8 @@ export class Agent {
   }
 
   async getMcpTool(tool: McpTool) {
+    const cacheKey = `${this.config.tenantId}-${this.config.projectId}-${tool.id}-${tool.credentialReferenceId || 'no-cred'}`;
+
     const credentialReferenceId = tool.credentialReferenceId;
 
     const toolsForAgent = await getToolsForAgent(dbClient)({
@@ -681,14 +686,73 @@ export class Agent {
       'Built MCP server config with credentials'
     );
 
+    let client = this.mcpClientCache.get(cacheKey);
+
+    if (client && !client.isConnected()) {
+      this.mcpClientCache.delete(cacheKey);
+      client = undefined;
+    }
+
+    if (!client) {
+      // Check if there's already a connection attempt in progress
+      let connectionPromise = this.mcpConnectionLocks.get(cacheKey);
+
+      if (!connectionPromise) {
+        // No existing attempt - create new connection promise
+        connectionPromise = this.createMcpConnection(tool, serverConfig);
+        this.mcpConnectionLocks.set(cacheKey, connectionPromise);
+      }
+
+      try {
+        client = await connectionPromise;
+        // Only cache successful connections
+        this.mcpClientCache.set(cacheKey, client);
+      } catch (error) {
+        // Clean up failed connection attempt
+        this.mcpConnectionLocks.delete(cacheKey);
+        logger.error(
+          {
+            toolName: tool.name,
+            agentId: this.config.id,
+            cacheKey,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'MCP connection failed'
+        );
+        throw error;
+      }
+    }
+
+    // For all cases (cached, locked, or newly created), get the tools
+    const tools = await client.tools();
+
+    return tools;
+  }
+
+  private async createMcpConnection(
+    tool: McpTool,
+    serverConfig: McpServerConfig
+  ): Promise<McpClient> {
     // Create and connect MCP client
     const client = new McpClient({
       name: tool.name,
       server: serverConfig,
     });
 
-    await client.connect();
-    return client.tools();
+    try {
+      await client.connect();
+      return client;
+    } catch (error) {
+      logger.error(
+        {
+          toolName: tool.name,
+          agentId: this.config.id,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Agent failed to connect to MCP server'
+      );
+      throw error;
+    }
   }
 
   getFunctionTools(streamRequestId?: string) {
@@ -852,17 +916,15 @@ export class Agent {
    * Build adaptive system prompt for Phase 2 structured output generation
    * based on configured data components and artifact components across the graph
    */
-  private async buildPhase2SystemPrompt(
-    runtimeContext?: {
-      contextId: string;
-      metadata: {
-        conversationId: string;
-        threadId: string;
-        streamRequestId?: string;
-        streamBaseUrl?: string;
-      };
-    }
-  ): Promise<string> {
+  private async buildPhase2SystemPrompt(runtimeContext?: {
+    contextId: string;
+    metadata: {
+      conversationId: string;
+      threadId: string;
+      streamRequestId?: string;
+      streamBaseUrl?: string;
+    };
+  }): Promise<string> {
     const phase2Config = new Phase2Config();
     const hasGraphArtifactComponents = await this.hasGraphArtifactComponents();
 
@@ -1911,7 +1973,7 @@ ${output}${structureHintsFormatted}`;
               if (conversationHistory.trim() !== '') {
                 phase2Messages.push({ role: 'user', content: conversationHistory });
               }
-              
+
               phase2Messages.push({ role: 'user', content: userMessage });
               phase2Messages.push(...reasoningFlow);
 
@@ -2000,7 +2062,7 @@ ${output}${structureHintsFormatted}`;
               if (conversationHistory.trim() !== '') {
                 phase2Messages.push({ role: 'user', content: conversationHistory });
               }
-              
+
               phase2Messages.push({ role: 'user', content: userMessage });
               phase2Messages.push(...reasoningFlow);
 
