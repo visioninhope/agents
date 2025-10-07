@@ -1529,7 +1529,8 @@ export class Agent {
               return result;
             } catch (err) {
               // Use helper function for consistent error handling
-              setSpanWithError(childSpan, err);
+              const errorObj = err instanceof Error ? err : new Error(String(err));
+              setSpanWithError(childSpan, errorObj);
               throw err;
             } finally {
               childSpan.end();
@@ -1721,6 +1722,9 @@ export class Agent {
                   parser.markToolResult();
                 }
                 break;
+              case 'error':
+                  // Handle streaming errors by throwing them to propagate up
+                  throw event.error;
               // Handle other event types if needed
             }
           }
@@ -2162,11 +2166,11 @@ ${output}${structureHintsFormatted}`;
         return formattedResponse;
       } catch (error) {
         // Don't clean up ToolSession on error - let ToolSessionManager handle cleanup
-
+        const errorToThrow = error instanceof Error ? error : new Error(String(error));
         // Record exception and mark span as error
-        setSpanWithError(span, error);
+        setSpanWithError(span, errorToThrow);
         span.end();
-        throw error;
+        throw errorToThrow;
       }
     });
   }
