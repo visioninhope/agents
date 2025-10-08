@@ -115,18 +115,21 @@ describe('Graph Full CRUD Routes - Integration Tests', () => {
     id,
     name: `Test ArtifactComponent${suffix}`,
     description: `Test artifactComponent description${suffix}`,
-    summaryProps: {
-      title: `Summary Title${suffix}`,
-      subtitle: `Summary Subtitle${suffix}`,
-      [`field${suffix}`]: `value${suffix}`,
-    },
-    fullProps: {
-      title: `Full Title${suffix}`,
-      subtitle: `Full Subtitle${suffix}`,
-      content: `Full content for artifactComponent${suffix}`,
-      metadata: {
-        author: `Author${suffix}`,
-        created: new Date().toISOString(),
+    props: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', inPreview: true },
+        subtitle: { type: 'string', inPreview: true },
+        [`field${suffix}`]: { type: 'string', inPreview: true },
+        content: { type: 'string', inPreview: false },
+        metadata: {
+          type: 'object',
+          inPreview: false,
+          properties: {
+            author: { type: 'string' },
+            created: { type: 'string' },
+          },
+        },
       },
     },
   });
@@ -1063,14 +1066,13 @@ describe('Graph Full CRUD Routes - Integration Tests', () => {
           id: acId,
           name: expect.stringContaining('Test ArtifactComponent'),
           description: expect.stringContaining('Test artifactComponent description'),
-          summaryProps: expect.objectContaining({
-            title: expect.stringContaining('Summary Title'),
-            subtitle: expect.stringContaining('Summary Subtitle'),
-          }),
-          fullProps: expect.objectContaining({
-            title: expect.stringContaining('Full Title'),
-            subtitle: expect.stringContaining('Full Subtitle'),
-            content: expect.stringContaining('Full content for artifactComponent'),
+          props: expect.objectContaining({
+            type: 'object',
+            properties: expect.objectContaining({
+              title: expect.any(Object),
+              subtitle: expect.any(Object),
+              content: expect.any(Object),
+            }),
           }),
         });
       }
