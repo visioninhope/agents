@@ -584,9 +584,7 @@ export const getFullGraphDefinition =
     if (contextConfig) {
       result.contextConfig = {
         id: contextConfig.id,
-        name: contextConfig.name,
-        description: contextConfig.description,
-        requestContextSchema: contextConfig.requestContextSchema,
+        headersSchema: contextConfig.headersSchema,
         contextVariables: contextConfig.contextVariables,
       };
     }

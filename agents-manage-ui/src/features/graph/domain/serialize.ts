@@ -324,20 +324,18 @@ export function serializeGraphData(
 
   const parsedContextVariables = safeJsonParse(metadata?.contextConfig?.contextVariables);
 
-  const parsedRequestContextSchema = safeJsonParse(metadata?.contextConfig?.requestContextSchema);
+  const parsedHeadersSchema = safeJsonParse(metadata?.contextConfig?.headersSchema);
 
   const hasContextConfig =
     metadata?.contextConfig &&
-    ((metadata.contextConfig.name && metadata.contextConfig.name.trim() !== '') ||
-      (metadata.contextConfig.description && metadata.contextConfig.description.trim() !== '') ||
-      (parsedContextVariables &&
-        typeof parsedContextVariables === 'object' &&
-        parsedContextVariables !== null &&
-        Object.keys(parsedContextVariables).length > 0) ||
-      (parsedRequestContextSchema &&
-        typeof parsedRequestContextSchema === 'object' &&
-        parsedRequestContextSchema !== null &&
-        Object.keys(parsedRequestContextSchema).length > 0));
+    ((parsedContextVariables &&
+      typeof parsedContextVariables === 'object' &&
+      parsedContextVariables !== null &&
+      Object.keys(parsedContextVariables).length > 0) ||
+      (parsedHeadersSchema &&
+        typeof parsedHeadersSchema === 'object' &&
+        parsedHeadersSchema !== null &&
+        Object.keys(parsedHeadersSchema).length > 0));
 
   const dataComponents: Record<string, DataComponent> = {};
   if (dataComponentLookup) {
@@ -416,9 +414,7 @@ export function serializeGraphData(
     (result as any).contextConfigId = contextConfigId;
     (result as any).contextConfig = {
       id: contextConfigId,
-      name: metadata.contextConfig.name || '',
-      description: metadata.contextConfig.description || '',
-      requestContextSchema: parsedRequestContextSchema,
+      headersSchema: parsedHeadersSchema,
       contextVariables: parsedContextVariables,
     };
   }

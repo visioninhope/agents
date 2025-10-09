@@ -96,9 +96,7 @@ export const createContextConfig = (db: DatabaseClient) => async (params: Contex
       tenantId: params.tenantId,
       projectId: params.projectId,
       graphId: params.graphId,
-      name: params.name,
-      description: params.description,
-      requestContextSchema: params.requestContextSchema ?? null,
+      headersSchema: params.headersSchema ?? null,
       contextVariables: contextVariables ?? null,
       createdAt: now,
       updatedAt: now,
@@ -128,9 +126,9 @@ export const updateContextConfig =
       }
     }
 
-    // Handle requestContextSchema clearing: null should remain null
-    if ('requestContextSchema' in params.data && params.data.requestContextSchema === null) {
-      processedData.requestContextSchema = null;
+    // Handle headersSchema clearing: null should remain null
+    if ('headersSchema' in params.data && params.data.headersSchema === null) {
+      processedData.headersSchema = null;
     }
 
     const updated = await db
@@ -200,19 +198,6 @@ export const countContextConfigs =
     return typeof total === 'string' ? Number.parseInt(total, 10) : (total as number);
   };
 
-export const getContextConfigsByName =
-  (db: DatabaseClient) => async (params: { scopes: GraphScopeConfig; name: string }) => {
-    return await db.query.contextConfigs.findMany({
-      where: and(
-        eq(contextConfigs.tenantId, params.scopes.tenantId),
-        eq(contextConfigs.projectId, params.scopes.projectId),
-        eq(contextConfigs.graphId, params.scopes.graphId),
-        eq(contextConfigs.name, params.name)
-      ),
-      orderBy: [desc(contextConfigs.createdAt)],
-    });
-  };
-
 /**
  * Upsert a context config (create if it doesn't exist, update if it does)
  */
@@ -237,9 +222,7 @@ export const upsertContextConfig =
           scopes,
           id: params.data.id,
           data: {
-            name: params.data.name,
-            description: params.data.description,
-            requestContextSchema: params.data.requestContextSchema,
+            headersSchema: params.data.headersSchema,
             contextVariables: params.data.contextVariables,
           },
         });
