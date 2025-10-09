@@ -9,7 +9,7 @@ overrides:
 
 patchedDependencies:
   '@changesets/assemble-release-plan@6.0.9':
-    hash: 4o4xvnq62nkojrm2vwqdgdti6i
+    hash: 57c6f1f9835fc6413b1565f909243d713314fac7b3e5fc8ccb3963a4c8b8d9a1
     path: patches/@changesets__assemble-release-plan.patch
 
 importers:
@@ -340,10 +340,6 @@ importers:
       zod:
         specifier: ^4.1.11
         version: 4.1.12
-    optionalDependencies:
-      keytar:
-        specifier: ^7.9.0
-        version: 7.9.0
     devDependencies:
       '@hono/vite-dev-server':
         specifier: ^0.20.1
@@ -375,6 +371,10 @@ importers:
       vitest:
         specifier: ^3.1.4
         version: 3.2.4(@types/debug@4.1.12)(@types/node@20.19.19)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.30.1)(tsx@4.20.6)(yaml@2.8.1)
+    optionalDependencies:
+      keytar:
+        specifier: ^7.9.0
+        version: 7.9.0
 
   agents-manage-ui:
     dependencies:
@@ -718,10 +718,6 @@ importers:
       zod:
         specifier: ^4.1.11
         version: 4.1.12
-    optionalDependencies:
-      keytar:
-        specifier: ^7.9.0
-        version: 7.9.0
     devDependencies:
       '@hono/vite-dev-server':
         specifier: ^0.20.1
@@ -765,6 +761,10 @@ importers:
       vitest:
         specifier: ^3.1.4
         version: 3.2.4(@types/debug@4.1.12)(@types/node@20.19.19)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.30.1)(tsx@4.20.6)(yaml@2.8.1)
+    optionalDependencies:
+      keytar:
+        specifier: ^7.9.0
+        version: 7.9.0
 
   agents-ui:
     dependencies:
@@ -926,10 +926,6 @@ importers:
       zod:
         specifier: ^4.1.11
         version: 4.1.12
-    optionalDependencies:
-      keytar:
-        specifier: ^7.9.0
-        version: 7.9.0
     devDependencies:
       '@types/jmespath':
         specifier: ^0.15.2
@@ -952,12 +948,25 @@ importers:
       vitest:
         specifier: ^3.1.4
         version: 3.2.4(@types/debug@4.1.12)(@types/node@20.19.19)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.30.1)(tsx@4.20.6)(yaml@2.8.1)
+    optionalDependencies:
+      keytar:
+        specifier: ^7.9.0
+        version: 7.9.0
 
   packages/agents-sdk:
     dependencies:
       '@inkeep/agents-core':
         specifier: workspace:^
         version: link:../agents-core
+      '@yarnpkg/lockfile':
+        specifier: ^1.1.0
+        version: 1.1.0
+      esbuild:
+        specifier: ^0.25.10
+        version: 0.25.10
+      js-yaml:
+        specifier: ^4.1.0
+        version: 4.1.0
       nanoid:
         specifier: ^5.1.5
         version: 5.1.6
@@ -965,9 +974,15 @@ importers:
         specifier: ^4.1.11
         version: 4.1.12
     devDependencies:
+      '@types/js-yaml':
+        specifier: ^4.0.9
+        version: 4.0.9
       '@types/node':
         specifier: ^20.11.24
         version: 20.19.19
+      '@types/yarnpkg__lockfile':
+        specifier: ^1.1.0
+        version: 1.1.9
       '@vitest/coverage-v8':
         specifier: ^2.0.0
         version: 2.1.9(vitest@3.2.4(@types/debug@4.1.12)(@types/node@20.19.19)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.30.1)(tsx@4.20.6)(yaml@2.8.1))
@@ -4650,6 +4665,9 @@ packages:
   '@types/jmespath@0.15.2':
     resolution: {integrity: sha512-pegh49FtNsC389Flyo9y8AfkVIZn9MMPE9yJrO9svhq6Fks2MwymULWjZqySuxmctd3ZH4/n7Mr98D+1Qo5vGA==}
 
+  '@types/js-yaml@4.0.9':
+    resolution: {integrity: sha512-k4MGaQl5TGo/iipqb2UDG2UwjXziSWkh0uysQelTlJpX1qGlpUZYm8PnO4DxG1qBomtJUdYJ6qR6xdIah10JLg==}
+
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
 
@@ -4738,6 +4756,9 @@ packages:
 
   '@types/ws@8.18.1':
     resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
+
+  '@types/yarnpkg__lockfile@1.1.9':
+    resolution: {integrity: sha512-GD4Fk15UoP5NLCNor51YdfL9MSdldKCqOC9EssrRw3HVfar9wUZ5y8Lfnp+qVD6hIinLr8ygklDYnmlnlQo12Q==}
 
   '@uiw/codemirror-extensions-basic-setup@4.25.2':
     resolution: {integrity: sha512-s2fbpdXrSMWEc86moll/d007ZFhu6jzwNu5cWv/2o7egymvLeZO52LWkewgbr+BUCGWGPsoJVWeaejbsb/hLcw==}
@@ -4857,6 +4878,9 @@ packages:
 
   '@xyflow/system@0.0.70':
     resolution: {integrity: sha512-PpC//u9zxdjj0tfTSmZrg3+sRbTz6kop/Amky44U2Dl51sxzDTIUfXMwETOYpmr2dqICWXBIJwXL2a9QWtX2XA==}
+
+  '@yarnpkg/lockfile@1.1.0':
+    resolution: {integrity: sha512-GpSwvyXOcOOlV70vbnzjj4fW5xW/FdUF6nQEt1ENy7m4ZCczi1+/buVUPAqmGfqznsORNFzUMjctTIp8a9tuCQ==}
 
   '@zag-js/core@1.26.1':
     resolution: {integrity: sha512-JesW6C1dlrG36Aa+yteL0v5nt4Zqa9n9coqDJUQ9L1AYWzjz6NTHubsA7ysJlTKwl411gSsssmH9Ey5sRxFEWQ==}
@@ -10011,7 +10035,7 @@ snapshots:
       resolve-from: 5.0.0
       semver: 7.7.3
 
-  '@changesets/assemble-release-plan@6.0.9(patch_hash=4o4xvnq62nkojrm2vwqdgdti6i)':
+  '@changesets/assemble-release-plan@6.0.9(patch_hash=57c6f1f9835fc6413b1565f909243d713314fac7b3e5fc8ccb3963a4c8b8d9a1)':
     dependencies:
       '@changesets/errors': 0.2.0
       '@changesets/get-dependents-graph': 2.1.3
@@ -10027,7 +10051,7 @@ snapshots:
   '@changesets/cli@2.29.7(@types/node@24.7.0)':
     dependencies:
       '@changesets/apply-release-plan': 7.0.13
-      '@changesets/assemble-release-plan': 6.0.9(patch_hash=4o4xvnq62nkojrm2vwqdgdti6i)
+      '@changesets/assemble-release-plan': 6.0.9(patch_hash=57c6f1f9835fc6413b1565f909243d713314fac7b3e5fc8ccb3963a4c8b8d9a1)
       '@changesets/changelog-git': 0.2.1
       '@changesets/config': 3.1.1
       '@changesets/errors': 0.2.0
@@ -10080,7 +10104,7 @@ snapshots:
 
   '@changesets/get-release-plan@4.0.13':
     dependencies:
-      '@changesets/assemble-release-plan': 6.0.9(patch_hash=4o4xvnq62nkojrm2vwqdgdti6i)
+      '@changesets/assemble-release-plan': 6.0.9(patch_hash=57c6f1f9835fc6413b1565f909243d713314fac7b3e5fc8ccb3963a4c8b8d9a1)
       '@changesets/config': 3.1.1
       '@changesets/pre': 2.0.2
       '@changesets/read': 0.6.5
@@ -14230,6 +14254,8 @@ snapshots:
 
   '@types/jmespath@0.15.2': {}
 
+  '@types/js-yaml@4.0.9': {}
+
   '@types/json-schema@7.0.15': {}
 
   '@types/jsonfile@6.1.4':
@@ -14328,6 +14354,8 @@ snapshots:
   '@types/ws@8.18.1':
     dependencies:
       '@types/node': 20.19.19
+
+  '@types/yarnpkg__lockfile@1.1.9': {}
 
   '@uiw/codemirror-extensions-basic-setup@4.25.2(@codemirror/autocomplete@6.19.0)(@codemirror/commands@6.9.0)(@codemirror/language@6.11.3)(@codemirror/lint@6.9.0)(@codemirror/search@6.5.11)(@codemirror/state@6.5.2)(@codemirror/view@6.38.5)':
     dependencies:
@@ -14521,6 +14549,8 @@ snapshots:
       d3-interpolate: 3.0.1
       d3-selection: 3.0.0
       d3-zoom: 3.0.0
+
+  '@yarnpkg/lockfile@1.1.0': {}
 
   '@zag-js/core@1.26.1':
     dependencies:

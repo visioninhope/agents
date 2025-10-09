@@ -17,6 +17,7 @@ import {
   type ApiKeyApiUpdateSchema,
   ArtifactComponentApiInsertSchema as ArtifactComponentApiInsertSchemaFromValidation,
   FullGraphAgentInsertSchema,
+  type FunctionApiInsertSchema,
   type GraphStopWhen,
   GraphStopWhenSchema,
   type ModelSettings,
@@ -37,6 +38,13 @@ export {
   type GraphStopWhen,
   type AgentStopWhen,
 };
+
+export {
+  FunctionApiInsertSchema,
+  FunctionApiSelectSchema,
+  FunctionApiUpdateSchema,
+  SandboxConfigSchema,
+} from './validation/schemas';
 
 // Common parameter schemas
 export const TenantParamsSchema = z.object({
@@ -251,6 +259,7 @@ export const FullGraphDefinitionSchema = AgentGraphApiInsertSchema.extend({
 // Export inferred types
 export type AgentApiInsert = z.infer<typeof AgentApiInsertSchema>;
 export type ToolApiInsert = z.infer<typeof ToolApiInsertSchema>;
+export type FunctionApiInsert = z.infer<typeof FunctionApiInsertSchema>;
 export type ApiKeyApiSelect = z.infer<typeof ApiKeyApiSelectSchema>;
 export type ApiKeyApiCreationResponse = z.infer<typeof ApiKeyApiCreationResponseSchema>;
 export type ApiKeyApiUpdateResponse = z.infer<typeof ApiKeyApiUpdateSchema>;

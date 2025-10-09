@@ -33,6 +33,7 @@ import type { ArtifactComponentInterface } from './artifact-component';
 import type { AgentMcpConfig } from './builders';
 import type { DataComponentInterface } from './data-component';
 import type { ExternalAgentConfig } from './externalAgent';
+import type { FunctionTool } from './function-tool';
 import type { Tool } from './tool';
 
 // Re-export ModelSettings from agents-core for convenience
@@ -41,10 +42,15 @@ export type { ModelSettings };
 /**
  * Tool instance that may have additional metadata attached during agent processing
  */
-export type AgentTool = Tool & {
-  selectedTools?: string[];
-  headers?: Record<string, string>;
-};
+export type AgentTool =
+  | (Tool & {
+      selectedTools?: string[];
+      headers?: Record<string, string>;
+    })
+  | (FunctionTool & {
+      selectedTools?: string[];
+      headers?: Record<string, string>;
+    });
 
 // Core message types following OpenAI pattern
 export interface UserMessage {
@@ -90,7 +96,7 @@ export interface ToolResult {
 }
 export type AllAgentInterface = AgentInterface | ExternalAgentInterface;
 
-export type AgentCanUseType = Tool | AgentMcpConfig;
+export type AgentCanUseType = Tool | AgentMcpConfig | FunctionTool;
 
 // Agent configuration types
 export interface AgentConfig extends Omit<AgentApiInsert, 'projectId'> {
@@ -164,6 +170,8 @@ export interface FetchDefinitionConfig {
   timeout?: number;
   credential?: CredentialReferenceApiInsert;
 }
+
+export type { FunctionToolConfig, SandboxConfig } from '@inkeep/agents-core';
 
 export interface RequestSchemaDefinition {
   body?: z.ZodSchema<any>;

@@ -619,6 +619,7 @@ describe('AgentGraph', () => {
             transferCountIs: 15,
             stepCountIs: 25,
           },
+          sandboxConfig: null,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         })
@@ -806,6 +807,7 @@ describe('AgentGraph', () => {
           description: 'Test project',
           models: null,
           stopWhen: null,
+          sandboxConfig: null,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         })
@@ -969,6 +971,7 @@ describe('AgentGraph', () => {
             transferCountIs: 15,
             stepCountIs: 25,
           },
+          sandboxConfig: null,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         })
@@ -1119,6 +1122,7 @@ describe('AgentGraph', () => {
               base: { model: 'gpt-4o' },
             },
             stopWhen: null,
+            sandboxConfig: null,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           })
@@ -1219,6 +1223,7 @@ describe('AgentGraph', () => {
               transferCountIs: 12,
               // no stepCountIs
             },
+            sandboxConfig: null,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           })

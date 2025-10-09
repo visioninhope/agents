@@ -26,6 +26,7 @@ import {
   type ExtendedFullGraphDefinition,
   extractGraphMetadata,
   serializeGraphData,
+  validateSerializedData,
 } from '@/features/graph/domain';
 import { useGraphActions, useGraphStore } from '@/features/graph/state/use-graph-store';
 import { useGraphShortcuts } from '@/features/graph/ui/use-graph-shortcuts';
@@ -578,6 +579,23 @@ function Flow({
       artifactComponentLookup,
       agentToolConfigLookup
     );
+
+    // Validate the serialized data before saving
+    const validationErrors = validateSerializedData(serializedData);
+    if (validationErrors.length > 0) {
+      // Convert validation errors to the format expected by parseGraphValidationErrors
+      const errorObjects = validationErrors.map((error) => ({
+        message: error,
+        field: 'general',
+        code: 'custom_validation',
+        path: [],
+      }));
+
+      const errorSummary = parseGraphValidationErrors(JSON.stringify(errorObjects));
+      setErrors(errorSummary);
+      toast.error(`Validation failed: ${validationErrors[0]}`);
+      return;
+    }
 
     const res = await saveGraph(
       tenantId,

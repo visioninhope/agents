@@ -1044,6 +1044,7 @@ export const updateFullGraphServerSide =
               (async () => {
                 try {
                   const { toolId, toolSelection, headers, agentToolRelationId } = canUseItem;
+                  logger.info({ agentId, toolId }, 'Processing agent-tool relation');
                   await upsertAgentToolRelation(db)({
                     scopes: { tenantId, projectId, graphId: finalGraphId },
                     agentId,
